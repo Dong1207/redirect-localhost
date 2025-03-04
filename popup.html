@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Localhost Redirect</title>
+    <link rel="stylesheet" type="text/css" href="popup.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Localhost Redirect</h1>
+
+      <div class="enable-toggle">
+        <label class="switch">
+          <input type="checkbox" id="enableToggle" />
+          <span class="slider round"></span>
+        </label>
+        <span>Enable Redirect</span>
+      </div>
+
+      <div class="stats">
+        <p>Redirected requests: <span id="redirectCount">0</span></p>
+      </div>
+
+      <div id="rulesContainer">
+        <!-- Rules will be added here dynamically -->
+      </div>
+
+      <button id="addRuleBtn" class="btn add-btn">+ Add New Rule</button>
+
+      <!-- Template for rule form -->
+      <template id="ruleTemplate">
+        <div class="rule-item">
+          <div class="rule-header">
+            <div class="rule-title-container">
+              <span class="collapse-icon"
+                ><i class="fas fa-chevron-down"></i
+              ></span>
+              <h3 class="rule-title">Rule</h3>
+            </div>
+            <div class="rule-actions">
+              <span class="rule-status active">Active</span>
+              <button class="btn delete-btn">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="rule-details">
+            <div class="form-group">
+              <label>From URL:</label>
+              <input
+                type="text"
+                class="from-url-input"
+                placeholder="https://cdn.shopify.com/**"
+              />
+              <p class="hint">Use ** as wildcard to capture any part of the URL</p>
+            </div>
+            <div class="form-group">
+              <label>To URL:</label>
+              <input
+                type="text"
+                class="to-url-input"
+                placeholder="https://localhost:3010/scripttag/**"
+              />
+              <p class="hint">
+                Parts matched by ** will replace ** in To URL. Be sure to include https:// or http://
+              </p>
+            </div>
+            <div class="form-group">
+              <label>Resource Types:</label>
+              <div class="resource-types">
+                <label
+                  ><input type="checkbox" value="main_frame" checked />
+                  Pages</label
+                >
+                <label
+                  ><input type="checkbox" value="stylesheet" checked />
+                  CSS</label
+                >
+                <label
+                  ><input type="checkbox" value="script" checked /> JS</label
+                >
+                <label
+                  ><input type="checkbox" value="image" checked /> Images</label
+                >
+                <label
+                  ><input type="checkbox" value="xmlhttprequest" checked />
+                  XHR</label
+                >
+                <label
+                  ><input type="checkbox" value="other" checked /> Other</label
+                >
+              </div>
+            </div>
+            <div class="rule-test">
+              <h4>Test Redirect</h4>
+              <div class="debug-info" style="font-size: 11px; color: #666; margin-bottom: 8px;">
+                Tips: Try without ^ and $ in regex, press F12 to see console logs
+              </div>
+              <div class="test-container">
+                <input
+                  type="text"
+                  class="test-input"
+                  placeholder="Enter full URL to test including https://"
+                />
+                <button class="btn test-btn">Test</button>
+              </div>
+              <div class="test-result"></div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
