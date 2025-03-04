@@ -89,6 +89,7 @@ async function updateRedirectRules() {
 
         // No wildcard, use exact URL matching
         if (wildcardIndex === -1) {
+          // ...existing code for no wildcard...
           return {
             id: index + 1,
             priority: 1,
@@ -118,6 +119,7 @@ async function updateRedirectRules() {
             );
           }
 
+          // Since there's no wildcard in the target URL, we'll use a simpler approach
           return {
             id: index + 1,
             priority: 1,
@@ -142,11 +144,11 @@ async function updateRedirectRules() {
           // If there's a suffix, we need to capture everything between prefix and suffix
           regexPattern = escapeRegExp(prefix) + "(.*?)" + escapeRegExp(suffix);
         } else {
-          // If no suffix, capture everything after the prefix
+          // If no suffix, capture everything after the prefix - use greedy matching
           regexPattern = escapeRegExp(prefix) + "(.*)";
         }
 
-        // The substitution pattern
+        // For the declarativeNetRequest API, the substitution uses $1, $2, etc. for captures
         const regexSubstitution = targetPrefix + "$1" + targetSuffix;
 
         if (DEBUG) {
@@ -161,18 +163,26 @@ async function updateRedirectRules() {
             regexSubstitution,
           });
 
-          // Test the pattern with a sample URL to verify
           try {
-            const testUrl = fromUrl.replace("**", "test-content");
+            // Test with a realistic value
+            const testContent = "avada-joy.min.js?v=1741081694801";
+            const testUrl = prefix + testContent + (suffix || "");
             const testRegex = new RegExp(regexPattern);
             const match = testRegex.exec(testUrl);
-            console.log(`Test matching: ${testUrl} against ${regexPattern}`, {
-              matches: !!match,
-              capture: match ? match[1] : null,
-              result: match
-                ? testUrl.replace(testRegex, regexSubstitution)
-                : null,
-            });
+
+            if (match) {
+              const captured = match[1];
+              const expectedResult = targetPrefix + captured + targetSuffix;
+              console.log(`Test redirect simulation:`, {
+                originalUrl: testUrl,
+                capturedContent: captured,
+                expectedRedirectUrl: expectedResult,
+              });
+            } else {
+              console.warn(
+                `Test pattern didn't match: ${testUrl} with regex ${regexPattern}`
+              );
+            }
           } catch (e) {
             console.error("Error testing regex pattern:", e);
           }
@@ -207,8 +217,48 @@ async function updateRedirectRules() {
     });
 
     console.log("Rules successfully updated!");
+
+    // Add a log to check all active rules
+    checkActiveRules();
   } catch (error) {
     console.error("Error updating redirect rules:", error);
+  }
+}
+
+// Function to check and log all active rules
+async function checkActiveRules() {
+  try {
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    console.log("Current active rules:", rules);
+
+    // Log detailed information about each rule
+    for (const rule of rules) {
+      console.log(`Rule ${rule.id} details:`, {
+        condition: rule.condition,
+        action: rule.action,
+      });
+
+      // If it's a regex rule, try to explain it
+      if (rule.condition.regexFilter) {
+        const regexFilter = rule.condition.regexFilter;
+        console.log(`Rule ${rule.id} regex explanation:`, {
+          regexFilter,
+          meaning: "Matches URLs that follow this pattern",
+        });
+      }
+
+      // If it's a regex substitution, explain how it works
+      if (rule.action.redirect && rule.action.redirect.regexSubstitution) {
+        const substitution = rule.action.redirect.regexSubstitution;
+        console.log(`Rule ${rule.id} substitution explanation:`, {
+          substitution,
+          meaning:
+            "Will redirect to this URL pattern, replacing $1, $2, etc. with captured content",
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error checking active rules:", error);
   }
 }
 
@@ -239,7 +289,7 @@ chrome.webRequest?.onBeforeRedirect?.addListener(
 
 // Enhanced logging for rule matching
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
-  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
+  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
     const requestUrl = info.request.url;
     const redirectUrl = info.redirect
       ? info.redirect.url
@@ -248,26 +298,60 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
     console.log("Rule matched:", info);
     console.log(`Redirect detected: ${requestUrl} -> ${redirectUrl}`);
 
-    // Try to find the rule that matched and log detailed info
-    chrome.declarativeNetRequest
-      .getDynamicRules()
-      .then((rules) => {
-        const matchedRule = rules.find((rule) => rule.id === info.rule.ruleId);
-        if (matchedRule) {
-          console.log("Matched rule details:", matchedRule);
+    try {
+      // Try to find the rule that matched and log detailed info
+      const rules = await chrome.declarativeNetRequest.getDynamicRules();
+      const matchedRule = rules.find((rule) => rule.id === info.rule.ruleId);
 
-          // For regex rules, test the matching manually to debug
-          if (matchedRule.condition.regexFilter) {
-            const regex = new RegExp(matchedRule.condition.regexFilter);
-            const match = regex.exec(requestUrl);
+      if (matchedRule) {
+        console.log("Matched rule details:", matchedRule);
+
+        // For regex rules, test the matching manually to debug
+        if (matchedRule.condition.regexFilter) {
+          const regex = new RegExp(matchedRule.condition.regexFilter);
+          const match = regex.exec(requestUrl);
+
+          if (match) {
+            const captures = match.slice(1);
             console.log("Regex test results:", {
-              matches: !!match,
-              captureGroups: match ? match.slice(1) : [],
+              matches: true,
+              captureGroups: captures,
             });
+
+            // If using regexSubstitution, show what the result should be
+            if (matchedRule.action.redirect.regexSubstitution) {
+              const sub = matchedRule.action.redirect.regexSubstitution;
+              let expected = sub;
+
+              // Replace $1, $2, etc. with actual captured values
+              captures.forEach((capture, i) => {
+                expected = expected.replace(`$${i + 1}`, capture);
+              });
+
+              console.log("Expected redirect URL:", expected);
+
+              // If redirect URL is unknown, there might be an issue
+              if (redirectUrl === "Unknown destination") {
+                console.warn("Redirect URL is unknown. Potential issues:");
+                console.warn("1. The regex might not be matching as expected");
+                console.warn("2. The substitution pattern might be incorrect");
+                console.warn("3. There might be a syntax error in the rule");
+              }
+            }
+          } else {
+            console.warn(
+              "Rule matched but regex test failed. This shouldn't happen!"
+            );
           }
         }
-      })
-      .catch((err) => console.error("Error fetching rule details:", err));
+      } else {
+        console.warn(
+          `Couldn't find matching rule with ID: ${info.rule.ruleId}`
+        );
+      }
+    } catch (err) {
+      console.error("Error analyzing rule match:", err);
+    }
 
     redirectCount++;
     chrome.storage.local.set({redirectCount});
