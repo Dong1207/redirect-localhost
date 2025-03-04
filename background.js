@@ -100,6 +100,7 @@ async function updateRedirectRules() {
     const newRules = redirectRules
       .map((rule, index) => {
         if (!rule.fromUrl || !rule.toUrl) return null;
+        console.log("rule", rule);
 
         const resourceTypes =
           rule.resourceTypes && rule.resourceTypes.length > 0
@@ -166,23 +167,22 @@ async function updateRedirectRules() {
         let regexPattern;
         if (suffix) {
           // With suffix, capture everything between prefix and suffix
-          regexPattern = escapeRegExp(prefix) + "(.*?)" + escapeRegExp(suffix);
+          regexPattern =
+            "^" + escapeRegExp(prefix) + "(.*?)" + escapeRegExp(suffix) + "$";
         } else {
           // No suffix, capture everything after the prefix
-          regexPattern = escapeRegExp(prefix) + "(.*)";
+          regexPattern = "^" + escapeRegExp(prefix) + "(.*)$";
         }
 
         // The substitution pattern for the declarativeNetRequest API
-        const regexSubstitution = targetPrefix + "$1" + targetSuffix;
+        const regexSubstitution = targetPrefix + "\\1" + targetSuffix;
 
         return {
           id: index + 1,
           priority: 1,
           action: {
             type: "redirect",
-            redirect: {
-              regexSubstitution: regexSubstitution,
-            },
+            redirect: {regexSubstitution: regexSubstitution},
           },
           condition: {
             regexFilter: regexPattern,
@@ -191,6 +191,11 @@ async function updateRedirectRules() {
         };
       })
       .filter(Boolean);
+
+    console.log(
+      "Generated declarativeNetRequest rules:",
+      JSON.stringify(newRules, null, 2)
+    );
 
     // Update the rules
     const currentRuleIds = await getCurrentRuleIds();
@@ -237,6 +242,7 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
       : "Unknown destination";
 
     debugLog("Rule matched:", {
+      info: info,
       url: requestUrl,
       redirectUrl: redirectUrl,
       ruleId: info.rule.ruleId,
