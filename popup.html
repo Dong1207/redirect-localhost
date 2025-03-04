@@ -7,25 +7,6 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
     />
-    <style>
-      /* Additional CSS for debugging tools */
-      .debug-section {
-        margin-top: 10px;
-        padding: 8px;
-        background-color: #f8f9fa;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 12px;
-      }
-      .debug-hint {
-        color: #666;
-        font-style: italic;
-      }
-      .diag-btn {
-        background-color: #2196F3;
-        color: white;
-      }
-    </style>
   </head>
   <body>
     <div class="container">
@@ -37,10 +18,76 @@
           <span class="slider round"></span>
         </label>
         <span>Enable Redirect</span>
+        
+        <div id="control-buttons" style="margin-left: auto; display: flex; gap: 8px;">
+          <button id="debugBtn" class="btn" style="font-size: 12px; padding: 4px 8px;">
+            <i class="fas fa-bug"></i> Debug
+          </button>
+          <button id="diagBtn" class="btn" style="font-size: 12px; padding: 4px 8px;">
+            <i class="fas fa-stethoscope"></i> Diagnose
+          </button>
+        </div>
       </div>
 
       <div class="stats">
         <p>Redirected requests: <span id="redirectCount">0</span></p>
+      </div>
+
+      <!-- Debug panel (initially hidden) -->
+      <div id="debugPanel" class="debug-section" style="display: none;">
+        <div class="tab-container">
+          <div class="tab active" data-tab="history">Redirect History</div>
+          <div class="tab" data-tab="tools">Debug Tools</div>
+          <div class="tab" data-tab="test">URL Tester</div>
+        </div>
+        
+        <div id="historyTab" class="tab-content active">
+          <div class="toggle-switch">
+            <label class="switch" style="transform: scale(0.8);">
+              <input type="checkbox" id="debugToPageToggle" />
+              <span class="slider round"></span>
+            </label>
+            <label for="debugToPageToggle">Log to page console</label>
+            
+            <button id="clearHistoryBtn" class="btn" style="margin-left: auto; font-size: 11px; padding: 3px 6px;">
+              Clear History
+            </button>
+          </div>
+          
+          <div id="redirectHistory" style="margin-top: 10px;">
+            <div class="history-empty">No redirects recorded yet.</div>
+          </div>
+        </div>
+        
+        <div id="toolsTab" class="tab-content">
+          <div style="margin-bottom: 10px;">
+            <button id="checkRulesBtn" class="btn diag-btn" style="width: 100%;">
+              <i class="fas fa-list"></i> Check Active Rules
+            </button>
+          </div>
+          
+          <div style="margin-bottom: 10px;">
+            <button id="testCurrentPageBtn" class="btn diag-btn" style="width: 100%;">
+              <i class="fas fa-globe"></i> Test Current Page URL
+            </button>
+          </div>
+          
+          <div style="margin-top: 15px;">
+            <button id="exportRulesBtn" class="btn" style="width: 100%; background-color: #4CAF50; color: white;">
+              <i class="fas fa-download"></i> Export Rules
+            </button>
+          </div>
+        </div>
+        
+        <div id="testTab" class="tab-content">
+          <div style="margin-bottom: 10px;">
+            <label>Test URL:</label>
+            <input type="text" id="testUrlInput" placeholder="https://cdn.shopify.com/..." style="width: 100%; margin-bottom: 8px;">
+            <button id="testUrlBtn" class="btn diag-btn" style="width: 100%;">Test URL</button>
+          </div>
+          
+          <div id="testUrlResult" style="margin-top: 10px; display: none;"></div>
+        </div>
       </div>
 
       <div id="rulesContainer">
@@ -54,13 +101,11 @@
         <div class="rule-item">
           <div class="rule-header">
             <div class="rule-title-container">
-              <span class="collapse-icon"
-                ><i class="fas fa-chevron-down"></i
-              ></span>
+              <span class="collapse-icon"><i class="fas fa-chevron-down"></i></span>
+              <span class="rule-status active"></span>
               <h3 class="rule-title">Rule</h3>
             </div>
             <div class="rule-actions">
-              <span class="rule-status active">Active</span>
               <button class="btn delete-btn">
                 <i class="fas fa-trash"></i>
               </button>
@@ -82,43 +127,25 @@
               <input
                 type="text"
                 class="to-url-input"
-                placeholder="https://localhost:3010/scripttag/**"
+                placeholder="http://localhost:3000/**"
               />
               <p class="hint">
-                Parts matched by ** will replace ** in To URL. Be sure to include https:// or http://
+                Parts matched by ** will replace ** in To URL. Use http:// for localhost.
               </p>
             </div>
             <div class="form-group">
               <label>Resource Types:</label>
               <div class="resource-types">
-                <label
-                  ><input type="checkbox" value="main_frame" checked />
-                  Pages</label
-                >
-                <label
-                  ><input type="checkbox" value="stylesheet" checked />
-                  CSS</label
-                >
-                <label
-                  ><input type="checkbox" value="script" checked /> JS</label
-                >
-                <label
-                  ><input type="checkbox" value="image" checked /> Images</label
-                >
-                <label
-                  ><input type="checkbox" value="xmlhttprequest" checked />
-                  XHR</label
-                >
-                <label
-                  ><input type="checkbox" value="other" checked /> Other</label
-                >
+                <label><input type="checkbox" value="main_frame" checked /> Pages</label>
+                <label><input type="checkbox" value="stylesheet" checked /> CSS</label>
+                <label><input type="checkbox" value="script" checked /> JS</label>
+                <label><input type="checkbox" value="image" checked /> Images</label>
+                <label><input type="checkbox" value="xmlhttprequest" checked /> XHR</label>
+                <label><input type="checkbox" value="other" checked /> Other</label>
               </div>
             </div>
             <div class="rule-test">
               <h4>Test Redirect</h4>
-              <div class="debug-info" style="font-size: 11px; color: #666; margin-bottom: 8px;">
-                Tips: Try without ^ and $ in regex, press F12 to see console logs
-              </div>
               <div class="test-container">
                 <input
                   type="text"

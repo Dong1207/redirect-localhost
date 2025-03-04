@@ -7,13 +7,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let redirectRules = [];
 
+  // Add new control buttons
+  const debugBtn = document.getElementById("debugBtn");
+  const diagBtn = document.getElementById("diagBtn");
+  const debugPanel = document.getElementById("debugPanel");
+  const debugToPageToggle = document.getElementById("debugToPageToggle");
+  const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+  const checkRulesBtn = document.getElementById("checkRulesBtn");
+  const testCurrentPageBtn = document.getElementById("testCurrentPageBtn");
+  const exportRulesBtn = document.getElementById("exportRulesBtn");
+  const testUrlInput = document.getElementById("testUrlInput");
+  const testUrlBtn = document.getElementById("testUrlBtn");
+  const testUrlResult = document.getElementById("testUrlResult");
+
   // Initialize popup
   loadSettings();
   updateRedirectCount();
+  setupTabs();
+  loadRedirectHistory();
 
   // Add event listeners
   enableToggle.addEventListener("change", toggleRedirect);
   addRuleBtn.addEventListener("click", addNewRule);
+  debugBtn.addEventListener("click", toggleDebugPanel);
+  diagBtn.addEventListener("click", showDiagnosticDialog);
+
+  // Debug panel event listeners
+  clearHistoryBtn.addEventListener("click", clearRedirectHistory);
+  checkRulesBtn.addEventListener("click", checkActiveRules);
+  testCurrentPageBtn.addEventListener("click", testCurrentPageUrl);
+  exportRulesBtn.addEventListener("click", exportRules);
+  testUrlBtn.addEventListener("click", testUrl);
+
+  // Set up debug toggle
+  chrome.storage.local.get(["debugToPage"], (result) => {
+    debugToPageToggle.checked = result.debugToPage === true;
+  });
+
+  debugToPageToggle.addEventListener("change", () => {
+    const enabled = debugToPageToggle.checked;
+    chrome.runtime.sendMessage(
+      {
+        action: "toggleDebugToPage",
+        enabled: enabled,
+      },
+      (response) => {
+        if (
+          response &&
+          response.debugEnabled !== undefined &&
+          response.debugEnabled !== enabled
+        ) {
+          debugToPageToggle.checked = response.debugEnabled;
+        }
+      }
+    );
+    chrome.storage.local.set({debugToPage: enabled});
+  });
 
   // Load settings from storage
   function loadSettings() {
@@ -108,11 +157,25 @@ document.addEventListener("DOMContentLoaded", () => {
     fromUrlInput.addEventListener("change", () => {
       updateRule(index);
       updateRuleTitle(ruleItem, redirectRules[index]);
+      chrome.storage.local.get(["enabled"], (result) => {
+        updateRuleStatus(
+          ruleItem,
+          redirectRules[index],
+          result.enabled === true
+        );
+      });
     });
 
     toUrlInput.addEventListener("change", () => {
       updateRule(index);
       updateRuleTitle(ruleItem, redirectRules[index]);
+      chrome.storage.local.get(["enabled"], (result) => {
+        updateRuleStatus(
+          ruleItem,
+          redirectRules[index],
+          result.enabled === true
+        );
+      });
     });
 
     const resourceCheckboxes = ruleItem.querySelectorAll(
@@ -169,6 +232,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Set data attribute for identifying the rule
     ruleItem.dataset.ruleIndex = index;
+
+    // Set initial status
+    chrome.storage.local.get(["enabled"], (result) => {
+      updateRuleStatus(ruleItem, rule, result.enabled === true);
+    });
 
     return ruleItem;
   }
@@ -257,122 +325,310 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.set({redirectRules});
   }
 
-  // Add a button to diagnose active rules
-  function initDiagnosticTools() {
-    const statsSection = document.querySelector(".stats");
-    if (!statsSection) return;
+  // Update rule status indicator
+  function updateRuleStatus(ruleElement, rule, isEnabled) {
+    const statusIndicator = ruleElement.querySelector(".rule-status");
+    if (isEnabled && rule.fromUrl && rule.toUrl) {
+      statusIndicator.classList.add("active");
+      statusIndicator.classList.remove("inactive");
+      statusIndicator.title = "Rule is active";
+    } else {
+      statusIndicator.classList.add("inactive");
+      statusIndicator.classList.remove("active");
+      statusIndicator.title = isEnabled
+        ? "Rule is incomplete (missing URL)"
+        : "Extension is disabled";
+    }
+  }
 
-    // Add diagnostic button
-    const diagButton = document.createElement("button");
-    diagButton.textContent = "Diagnose Rules";
-    diagButton.className = "btn diag-btn";
-    diagButton.style.marginLeft = "10px";
-    diagButton.style.fontSize = "12px";
-    diagButton.style.padding = "4px 8px";
+  // Update all rule status indicators
+  function updateAllRuleStatuses() {
+    chrome.storage.local.get(["enabled"], (result) => {
+      const isEnabled = result.enabled === true;
 
-    diagButton.addEventListener("click", () => {
-      chrome.runtime.sendMessage({action: "getActiveRules"}, (response) => {
-        if (response.error) {
-          alert(`Error: ${response.error}`);
-          return;
+      const ruleElements = document.querySelectorAll(".rule-item");
+      ruleElements.forEach((ruleElement) => {
+        const ruleIndex = ruleElement.dataset.ruleIndex;
+        if (ruleIndex !== undefined && redirectRules[ruleIndex]) {
+          updateRuleStatus(ruleElement, redirectRules[ruleIndex], isEnabled);
         }
-
-        const rules = response.rules || [];
-
-        // Create simple report
-        let report = `Active Rules: ${rules.length}\n\n`;
-
-        rules.forEach((rule) => {
-          report += `--- Rule ${rule.id} ---\n`;
-
-          if (rule.condition.regexFilter) {
-            report += `Pattern: ${rule.condition.regexFilter}\n`;
-          } else if (rule.condition.urlFilter) {
-            report += `URL Filter: ${rule.condition.urlFilter}\n`;
-          }
-
-          if (rule.action.redirect.regexSubstitution) {
-            report += `Redirect: ${rule.action.redirect.regexSubstitution}\n`;
-          } else if (rule.action.redirect.url) {
-            report += `Redirect: ${rule.action.redirect.url}\n`;
-          }
-
-          report += `Resources: ${rule.condition.resourceTypes.join(", ")}\n\n`;
-        });
-
-        alert(report);
       });
     });
-
-    statsSection.appendChild(diagButton);
   }
 
-  // Add debug toggle at the top
-  function initDebugToggle() {
-    const statsSection = document.querySelector(".stats");
-    if (!statsSection) return;
+  // Override the display rules function to update statuses
+  const originalDisplayRules = displayRules;
+  displayRules = function () {
+    originalDisplayRules();
+    updateAllRuleStatuses();
+  };
 
-    const debugToggle = document.createElement("div");
-    debugToggle.style.display = "flex";
-    debugToggle.style.alignItems = "center";
-    debugToggle.style.marginLeft = "10px";
-    debugToggle.style.fontSize = "12px";
+  // Override the toggle redirect function to update statuses
+  const originalToggleRedirect = toggleRedirect;
+  toggleRedirect = function () {
+    originalToggleRedirect();
+    updateAllRuleStatuses();
+  };
 
-    const debugToggleLabel = document.createElement("label");
-    debugToggleLabel.className = "switch";
-    debugToggleLabel.style.marginRight = "6px";
-    debugToggleLabel.style.transform = "scale(0.8)";
+  // Functions for debug panel
+  function toggleDebugPanel() {
+    if (debugPanel.style.display === "none") {
+      debugPanel.style.display = "block";
+      debugBtn.style.backgroundColor = "#2196F3";
+      debugBtn.style.color = "white";
+      loadRedirectHistory(); // Refresh history
+    } else {
+      debugPanel.style.display = "none";
+      debugBtn.style.backgroundColor = "";
+      debugBtn.style.color = "";
+    }
+  }
 
-    const debugToggleInput = document.createElement("input");
-    debugToggleInput.type = "checkbox";
-    debugToggleInput.id = "debugToggle";
+  function setupTabs() {
+    const tabs = document.querySelectorAll(".tab");
+    const tabContents = document.querySelectorAll(".tab-content");
 
-    // Load the current debug state
-    chrome.storage.local.get(["debugToPage"], (result) => {
-      if (result.debugToPage === true) {
-        debugToggleInput.checked = true;
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        // Remove active class from all tabs and contents
+        tabs.forEach((t) => t.classList.remove("active"));
+        tabContents.forEach((c) => c.classList.remove("active"));
+
+        // Add active class to selected tab and content
+        tab.classList.add("active");
+        const tabContentId = tab.getAttribute("data-tab") + "Tab";
+        document.getElementById(tabContentId).classList.add("active");
+      });
+    });
+  }
+
+  function loadRedirectHistory() {
+    chrome.runtime.sendMessage({action: "getRedirectHistory"}, (response) => {
+      const historyContainer = document.getElementById("redirectHistory");
+      if (!historyContainer) return;
+
+      if (!response || !response.history || response.history.length === 0) {
+        historyContainer.innerHTML =
+          '<div class="history-empty">No redirects recorded yet.</div>';
+        return;
+      }
+
+      // Display history items
+      let html = "";
+      response.history.forEach((item) => {
+        const date = new Date(item.timestamp);
+        const timeString = date.toLocaleTimeString();
+        html += `
+          <div class="history-item">
+            <div class="history-time">${timeString}</div>
+            <div class="history-from">${truncateUrl(item.fromUrl, 60)}</div>
+            <div class="history-to">${truncateUrl(item.toUrl, 60)}</div>
+          </div>
+        `;
+      });
+
+      historyContainer.innerHTML = html;
+    });
+  }
+
+  function truncateUrl(url, maxLength) {
+    if (!url) return "Unknown URL";
+    if (url.length <= maxLength) return url;
+    return url.substring(0, maxLength - 3) + "...";
+  }
+
+  function clearRedirectHistory() {
+    chrome.runtime.sendMessage({action: "clearRedirectHistory"}, () => {
+      loadRedirectHistory(); // Refresh the display
+    });
+  }
+
+  function showDiagnosticDialog() {
+    chrome.runtime.sendMessage({action: "getActiveRules"}, (response) => {
+      if (response.error) {
+        alert(`Error: ${response.error}`);
+        return;
+      }
+
+      const rules = response.rules || [];
+      let report = `Active Rules: ${rules.length}\n\n`;
+
+      rules.forEach((rule) => {
+        report += `--- Rule ${rule.id} ---\n`;
+
+        if (rule.condition.regexFilter) {
+          report += `Pattern: ${rule.condition.regexFilter}\n`;
+        } else if (rule.condition.urlFilter) {
+          report += `URL Filter: ${rule.condition.urlFilter}\n`;
+        }
+
+        if (rule.action.redirect.regexSubstitution) {
+          report += `Redirect: ${rule.action.redirect.regexSubstitution}\n`;
+        } else if (rule.action.redirect.url) {
+          report += `Redirect: ${rule.action.redirect.url}\n`;
+        }
+
+        report += `Resources: ${rule.condition.resourceTypes.join(", ")}\n\n`;
+      });
+
+      alert(report);
+    });
+  }
+
+  function checkActiveRules() {
+    chrome.runtime.sendMessage({action: "getActiveRules"}, (response) => {
+      if (response.error) {
+        testUrlResult.innerHTML = `<div class="test-result error">${response.error}</div>`;
+        testUrlResult.style.display = "block";
+        return;
+      }
+
+      const rules = response.rules || [];
+      let html = `<div class="test-result"><strong>${rules.length} Active Rules</strong><br>`;
+
+      if (rules.length === 0) {
+        html += "No active rules found. Add rules and enable the extension.";
+      } else {
+        rules.forEach((rule) => {
+          let pattern =
+            rule.condition.regexFilter ||
+            rule.condition.urlFilter ||
+            "Unknown pattern";
+          let redirect =
+            rule.action.redirect.regexSubstitution ||
+            rule.action.redirect.url ||
+            "Unknown destination";
+
+          html += `<div style="margin-top:8px; padding:5px; background:#f1f1f1; border-radius:3px;">
+            <strong>Rule ${rule.id}</strong><br>
+            Pattern: ${pattern}<br>
+            Redirect: ${redirect}
+          </div>`;
+        });
+      }
+
+      html += "</div>";
+
+      // Show in the test tab
+      document.querySelector('.tab[data-tab="test"]').click();
+      testUrlResult.innerHTML = html;
+      testUrlResult.style.display = "block";
+    });
+  }
+
+  function testCurrentPageUrl() {
+    // Get current active tab URL
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+      if (tabs[0]?.url) {
+        testUrlInput.value = tabs[0].url;
+        testUrl();
+      } else {
+        testUrlResult.innerHTML =
+          '<div class="test-result error">Could not get current tab URL</div>';
+        testUrlResult.style.display = "block";
       }
     });
-
-    const debugToggleSlider = document.createElement("span");
-    debugToggleSlider.className = "slider round";
-
-    const debugToggleText = document.createElement("span");
-    debugToggleText.textContent = "Debug";
-
-    debugToggleLabel.appendChild(debugToggleInput);
-    debugToggleLabel.appendChild(debugToggleSlider);
-    debugToggle.appendChild(debugToggleLabel);
-    debugToggle.appendChild(debugToggleText);
-
-    statsSection.appendChild(debugToggle);
-
-    // Toggle debug mode
-    debugToggleInput.addEventListener("change", () => {
-      const enabled = debugToggleInput.checked;
-      chrome.runtime.sendMessage(
-        {
-          action: "toggleDebugToPage",
-          enabled: enabled,
-        },
-        (response) => {
-          // Make sure the UI reflects the actual state in case permission was denied
-          if (
-            response &&
-            response.debugEnabled !== undefined &&
-            response.debugEnabled !== enabled
-          ) {
-            debugToggleInput.checked = response.debugEnabled;
-          }
-        }
-      );
-
-      // Save state to storage directly too (backup)
-      chrome.storage.local.set({debugToPage: enabled});
-    });
   }
 
-  // Initialize diagnostic tools
-  initDiagnosticTools();
-  initDebugToggle();
+  function exportRules() {
+    const rulesJson = JSON.stringify(redirectRules, null, 2);
+    const blob = new Blob([rulesJson], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.download = "redirect-rules.json";
+    a.href = url;
+    a.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+
+  function testUrl() {
+    const url = testUrlInput.value.trim();
+    if (!url) {
+      testUrlResult.innerHTML =
+        '<div class="test-result error">Please enter a URL to test</div>';
+      testUrlResult.style.display = "block";
+      return;
+    }
+
+    // Find matching rules
+    chrome.storage.local.get(["redirectRules", "enabled"], (result) => {
+      const rules = result.redirectRules || [];
+      const isEnabled = result.enabled === true;
+
+      if (!isEnabled) {
+        testUrlResult.innerHTML =
+          '<div class="test-result error">Extension is disabled. Enable it to use redirects.</div>';
+        testUrlResult.style.display = "block";
+        return;
+      }
+
+      if (rules.length === 0) {
+        testUrlResult.innerHTML =
+          '<div class="test-result error">No redirect rules defined.</div>';
+        testUrlResult.style.display = "block";
+        return;
+      }
+
+      // Test each rule
+      let matchFound = false;
+      let html = '<div class="test-result">';
+
+      // Create promises for each rule test
+      const testPromises = rules.map((rule) => {
+        return new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              action: "testUrlMatch",
+              inputUrl: url,
+              rule: rule,
+            },
+            (response) => {
+              if (response && response.matched) {
+                matchFound = true;
+                resolve({
+                  matched: true,
+                  rule,
+                  redirectUrl: response.redirectUrl,
+                  wildcardContent: response.wildcardContent,
+                });
+              } else {
+                resolve({matched: false, rule});
+              }
+            }
+          );
+        });
+      });
+
+      // Wait for all tests to complete
+      Promise.all(testPromises).then((results) => {
+        results.forEach((result) => {
+          if (result.matched) {
+            html += `
+              <div style="margin-bottom:10px; padding:8px; background:#d4edda; border-radius:4px; color:#155724;">
+                <strong>✓ Match found!</strong><br>
+                Rule: ${result.rule.fromUrl} → ${result.rule.toUrl}<br>
+                Redirect to: ${result.redirectUrl}
+                ${
+                  result.wildcardContent
+                    ? `<br>Wildcard content: ${result.wildcardContent}`
+                    : ""
+                }
+              </div>
+            `;
+          }
+        });
+
+        if (!matchFound) {
+          html +=
+            '<div style="color:#721c24">No matching rules found for this URL.</div>';
+        }
+
+        html += "</div>";
+        testUrlResult.innerHTML = html;
+        testUrlResult.style.display = "block";
+      });
+    });
+  }
 });

@@ -133,20 +133,19 @@ input:checked+.slider:before {
 }
 
 .rule-status {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 12px;
-    margin-right: 10px;
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
 }
 
 .rule-status.active {
-    background-color: #d4edda;
-    color: #155724;
+    background-color: #4CAF50;
 }
 
 .rule-status.inactive {
-    background-color: #f8d7da;
-    color: #721c24;
+    background-color: #F44336;
 }
 
 .rule-details {
@@ -283,4 +282,101 @@ select {
 .test-result.error {
     background-color: #f8d7da;
     color: #721c24;
+}
+
+/* Debugging tools styles */
+.debug-section {
+    margin-top: 10px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.debug-hint {
+    color: #666;
+    font-style: italic;
+}
+
+.diag-btn {
+    background-color: #2196F3;
+    color: white;
+}
+
+/* Tabs for debug panel */
+.tab-container {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.tab {
+    padding: 8px 12px;
+    background-color: #f1f1f1;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    flex-grow: 1;
+    text-align: center;
+    font-size: 12px;
+}
+
+.tab.active {
+    background-color: #2196F3;
+    color: white;
+    border-color: #2196F3;
+}
+
+.tab:first-child {
+    border-radius: 4px 0 0 4px;
+}
+
+.tab:last-child {
+    border-radius: 0 4px 4px 0;
+}
+
+.tab-content {
+    display: none;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Redirect history */
+.history-item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
+}
+
+.history-item:hover {
+    background-color: #f1f1f1;
+}
+
+.history-from {
+    color: #d32f2f;
+    word-break: break-all;
+}
+
+.history-to {
+    color: #388e3c;
+    word-break: break-all;
+}
+
+.history-time {
+    color: #666;
+    font-size: 10px;
+}
+
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.toggle-switch label {
+    margin-left: 8px;
+    margin-bottom: 0;
 }
