@@ -1,5 +1,26 @@
 let redirectCount = 0;
-const DEBUG = true;
+let debugToPage = false;
+
+// Helper function to log to both extension console and optionally page console
+function debugLog(...args) {
+  console.log(...args); // Always log to extension console
+  
+  if (debugToPage) {
+    // Try to log to the active tab's console
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+      if (tabs[0]) {
+        const tabId = tabs[0].id;
+        chrome.scripting.executeScript({
+          target: {tabId},
+          func: function(logArgs) {
+            console.log("[REDIRECT-EXTENSION]", ...logArgs);
+          },
+          args: [args]
+        }).catch(err => console.error("Failed to log to page console:", err));
+      }
+    });
+  }
+}
 
 // Initialize the extension
 chrome.runtime.onInstalled.addListener(() => {
@@ -37,10 +58,6 @@ async function updateRedirectRules() {
       "enabled",
     ]);
 
-    if (DEBUG) {
-      console.log("Updating redirect rules:", {enabled, redirectRules});
-    }
-
     if (!enabled || !redirectRules || redirectRules.length === 0) {
       // Clear all redirect rules if disabled or no rules exist
       const currentRuleIds = await getCurrentRuleIds();
@@ -57,30 +74,9 @@ async function updateRedirectRules() {
       .map((rule, index) => {
         if (!rule.fromUrl || !rule.toUrl) return null;
 
-        const resourceTypes =
-          rule.resourceTypes && rule.resourceTypes.length > 0
-            ? rule.resourceTypes
-            : [
-                "main_frame",
-                "sub_frame",
-                "stylesheet",
-                "script",
-                "image",
-                "font",
-                "object",
-                "xmlhttprequest",
-                "ping",
-                "csp_report",
-                "media",
-                "websocket",
-                "other",
-              ];
-
-        if (DEBUG) {
-          console.log(
-            `Processing rule ${index + 1}: ${rule.fromUrl} -> ${rule.toUrl}`
-          );
-        }
+        const resourceTypes = rule.resourceTypes && rule.resourceTypes.length > 0
+          ? rule.resourceTypes
+          : ["main_frame", "sub_frame", "stylesheet", "script", "image", "xmlhttprequest", "other"];
 
         // Parse the wildcard in the from URL
         const fromUrl = rule.fromUrl;
@@ -89,7 +85,6 @@ async function updateRedirectRules() {
 
         // No wildcard, use exact URL matching
         if (wildcardIndex === -1) {
-          // ...existing code for no wildcard...
           return {
             id: index + 1,
             priority: 1,
@@ -111,15 +106,8 @@ async function updateRedirectRules() {
         // Find the wildcard position in the target URL
         const targetWildcardIndex = toUrl.indexOf("**");
 
-        // If no wildcard in target URL, we can't perform a wildcard substitution
+        // If no wildcard in target URL, use direct URL matching
         if (targetWildcardIndex === -1) {
-          if (DEBUG) {
-            console.log(
-              `Rule ${index + 1}: Target URL has no wildcard, using direct URL`
-            );
-          }
-
-          // Since there's no wildcard in the target URL, we'll use a simpler approach
           return {
             id: index + 1,
             priority: 1,
@@ -134,59 +122,22 @@ async function updateRedirectRules() {
           };
         }
 
-        // If both URLs have wildcards, we can use regex substitution
+        // If both URLs have wildcards, use regex pattern matching
         const targetPrefix = toUrl.substring(0, targetWildcardIndex);
         const targetSuffix = toUrl.substring(targetWildcardIndex + 2);
 
-        // Create a regex pattern with non-greedy matching to capture the wildcard part
+        // Create a regex pattern with appropriate matching to capture the wildcard part
         let regexPattern;
         if (suffix) {
-          // If there's a suffix, we need to capture everything between prefix and suffix
+          // With suffix, capture everything between prefix and suffix
           regexPattern = escapeRegExp(prefix) + "(.*?)" + escapeRegExp(suffix);
         } else {
-          // If no suffix, capture everything after the prefix - use greedy matching
+          // No suffix, capture everything after the prefix
           regexPattern = escapeRegExp(prefix) + "(.*)";
         }
 
-        // For the declarativeNetRequest API, the substitution uses $1, $2, etc. for captures
+        // The substitution pattern for the declarativeNetRequest API
         const regexSubstitution = targetPrefix + "$1" + targetSuffix;
-
-        if (DEBUG) {
-          console.log(`Rule ${index + 1} detailed pattern:`, {
-            fromUrl,
-            toUrl,
-            prefix,
-            suffix,
-            targetPrefix,
-            targetSuffix,
-            regexPattern,
-            regexSubstitution,
-          });
-
-          try {
-            // Test with a realistic value
-            const testContent = "avada-joy.min.js?v=1741081694801";
-            const testUrl = prefix + testContent + (suffix || "");
-            const testRegex = new RegExp(regexPattern);
-            const match = testRegex.exec(testUrl);
-
-            if (match) {
-              const captured = match[1];
-              const expectedResult = targetPrefix + captured + targetSuffix;
-              console.log(`Test redirect simulation:`, {
-                originalUrl: testUrl,
-                capturedContent: captured,
-                expectedRedirectUrl: expectedResult,
-              });
-            } else {
-              console.warn(
-                `Test pattern didn't match: ${testUrl} with regex ${regexPattern}`
-              );
-            }
-          } catch (e) {
-            console.error("Error testing regex pattern:", e);
-          }
-        }
 
         return {
           id: index + 1,
@@ -205,60 +156,14 @@ async function updateRedirectRules() {
       })
       .filter(Boolean);
 
-    if (DEBUG) {
-      console.log("New rules to apply:", JSON.stringify(newRules, null, 2));
-    }
-
     // Update the rules
     const currentRuleIds = await getCurrentRuleIds();
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: currentRuleIds,
       addRules: newRules,
     });
-
-    console.log("Rules successfully updated!");
-
-    // Add a log to check all active rules
-    checkActiveRules();
   } catch (error) {
     console.error("Error updating redirect rules:", error);
-  }
-}
-
-// Function to check and log all active rules
-async function checkActiveRules() {
-  try {
-    const rules = await chrome.declarativeNetRequest.getDynamicRules();
-    console.log("Current active rules:", rules);
-
-    // Log detailed information about each rule
-    for (const rule of rules) {
-      console.log(`Rule ${rule.id} details:`, {
-        condition: rule.condition,
-        action: rule.action,
-      });
-
-      // If it's a regex rule, try to explain it
-      if (rule.condition.regexFilter) {
-        const regexFilter = rule.condition.regexFilter;
-        console.log(`Rule ${rule.id} regex explanation:`, {
-          regexFilter,
-          meaning: "Matches URLs that follow this pattern",
-        });
-      }
-
-      // If it's a regex substitution, explain how it works
-      if (rule.action.redirect && rule.action.redirect.regexSubstitution) {
-        const substitution = rule.action.redirect.regexSubstitution;
-        console.log(`Rule ${rule.id} substitution explanation:`, {
-          substitution,
-          meaning:
-            "Will redirect to this URL pattern, replacing $1, $2, etc. with captured content",
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error checking active rules:", error);
   }
 }
 
@@ -278,7 +183,7 @@ async function getCurrentRuleIds() {
   }
 }
 
-// Handle redirect counts using a different approach
+// Track redirected requests
 chrome.webRequest?.onBeforeRedirect?.addListener(
   () => {
     redirectCount++;
@@ -287,89 +192,40 @@ chrome.webRequest?.onBeforeRedirect?.addListener(
   {urls: ["<all_urls>"]}
 );
 
-// Enhanced logging for rule matching
+// Log when a rule is matched (if debugging is enabled)
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
-  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
+  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
     const requestUrl = info.request.url;
-    const redirectUrl = info.redirect
-      ? info.redirect.url
-      : "Unknown destination";
-
-    console.log("Rule matched:", info);
-    console.log(`Redirect detected: ${requestUrl} -> ${redirectUrl}`);
-
-    try {
-      // Try to find the rule that matched and log detailed info
-      const rules = await chrome.declarativeNetRequest.getDynamicRules();
-      const matchedRule = rules.find((rule) => rule.id === info.rule.ruleId);
-
-      if (matchedRule) {
-        console.log("Matched rule details:", matchedRule);
-
-        // For regex rules, test the matching manually to debug
-        if (matchedRule.condition.regexFilter) {
-          const regex = new RegExp(matchedRule.condition.regexFilter);
-          const match = regex.exec(requestUrl);
-
-          if (match) {
-            const captures = match.slice(1);
-            console.log("Regex test results:", {
-              matches: true,
-              captureGroups: captures,
-            });
-
-            // If using regexSubstitution, show what the result should be
-            if (matchedRule.action.redirect.regexSubstitution) {
-              const sub = matchedRule.action.redirect.regexSubstitution;
-              let expected = sub;
-
-              // Replace $1, $2, etc. with actual captured values
-              captures.forEach((capture, i) => {
-                expected = expected.replace(`$${i + 1}`, capture);
-              });
-
-              console.log("Expected redirect URL:", expected);
-
-              // If redirect URL is unknown, there might be an issue
-              if (redirectUrl === "Unknown destination") {
-                console.warn("Redirect URL is unknown. Potential issues:");
-                console.warn("1. The regex might not be matching as expected");
-                console.warn("2. The substitution pattern might be incorrect");
-                console.warn("3. There might be a syntax error in the rule");
-              }
-            }
-          } else {
-            console.warn(
-              "Rule matched but regex test failed. This shouldn't happen!"
-            );
-          }
-        }
-      } else {
-        console.warn(
-          `Couldn't find matching rule with ID: ${info.rule.ruleId}`
-        );
-      }
-    } catch (err) {
-      console.error("Error analyzing rule match:", err);
-    }
-
+    const redirectUrl = info.redirect ? info.redirect.url : "Unknown destination";
+    
+    debugLog("Rule matched:", {
+      url: requestUrl,
+      redirectUrl: redirectUrl,
+      ruleId: info.rule.ruleId
+    });
+    
     redirectCount++;
     chrome.storage.local.set({redirectCount});
   });
 }
 
-// Provide an interface for popup.js to get current redirect count
+// Message handling from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Get redirect count
   if (message.action === "getRedirectCount") {
     sendResponse({count: redirectCount});
-  } else if (message.action === "testUrlMatch") {
+    return true;
+  } 
+  
+  // Test URL matching
+  else if (message.action === "testUrlMatch") {
     const {inputUrl, rule} = message;
     try {
       const fromUrl = rule.fromUrl;
       const toUrl = rule.toUrl;
       const wildcardIndex = fromUrl.indexOf("**");
 
-      // No wildcard in from URL
+      // No wildcard in from URL - exact matching
       if (wildcardIndex === -1) {
         const matches = inputUrl === fromUrl;
         sendResponse({matched: matches, redirectUrl: matches ? toUrl : null});
@@ -382,14 +238,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // Check if URL matches the pattern
       if (!inputUrl.startsWith(prefix)) {
-        console.log(`URL doesn't start with prefix: ${prefix}`);
         sendResponse({matched: false});
         return true;
       }
 
       // If there's a suffix, ensure the URL ends with it
       if (suffix && !inputUrl.endsWith(suffix)) {
-        console.log(`URL doesn't end with suffix: ${suffix}`);
         sendResponse({matched: false});
         return true;
       }
@@ -419,13 +273,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           toUrl.substring(targetWildcardIndex + 2);
       }
 
-      console.log({
-        prefix,
-        suffix,
-        wildcardContent,
-        resultUrl,
-      });
-
       sendResponse({
         matched: true,
         redirectUrl: resultUrl,
@@ -436,8 +283,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({matched: false, error: error.message});
     }
     return true;
-  } else if (message.action === "getActiveRules") {
-    // Added functionality to inspect active rules
+  } 
+  
+  // Get active rules
+  else if (message.action === "getActiveRules") {
     chrome.declarativeNetRequest
       .getDynamicRules()
       .then((rules) => {
@@ -447,6 +296,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({error: error.message});
       });
     return true;
+  } 
+  
+  // Toggle debug to page
+  else if (message.action === "toggleDebugToPage") {
+    debugToPage = message.enabled;
+    
+    if (debugToPage) {
+      // Request scripting permission if needed
+      chrome.permissions.request({
+        permissions: ["scripting"]
+      }, (granted) => {
+        if (granted) {
+          injectDebugScript();
+        } else {
+          debugToPage = false;
+          console.log("Scripting permission denied, debug to page disabled");
+        }
+      });
+    }
+    
+    sendResponse({success: true});
+    return true;
   }
+  
   return true;
 });
+
+// Inject debug script
+async function injectDebugScript() {
+  try {
+    await chrome.scripting.registerContentScripts([{
+      id: "redirect-debug",
+      js: ["debug-inject.js"],
+      matches: ["<all_urls>"],
+      runAt: "document_start"
+    }]);
+  } catch (error) {
+    console.error("Failed to register debug script:", error);
+  }
+}

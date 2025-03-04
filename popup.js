@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
       redirectCountElem.textContent = result.redirectCount || 0;
     });
 
-    // Alternatively, we could get it from the background
+    // Get count from background service worker
     chrome.runtime.sendMessage({action: "getRedirectCount"}, (response) => {
       if (response && response.count !== undefined) {
         redirectCountElem.textContent = response.count;
@@ -61,10 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Test if a URL would be redirected by a rule
   function testRedirect(inputUrl, rule) {
     if (!rule.fromUrl || !rule.toUrl) return null;
-
-    console.log(`Testing: ${inputUrl} against rule:`, rule);
     
-    // Always use the background script's matching logic for consistency
+    // Use the background script's matching logic for consistency
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
         {
@@ -73,7 +71,6 @@ document.addEventListener("DOMContentLoaded", () => {
           rule: rule,
         },
         (response) => {
-          console.log("Background match test response:", response);
           if (response && response.matched) {
             resolve(response.redirectUrl);
           } else {
@@ -156,7 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      console.log("Testing URL:", inputUrl);
       const redirectedUrl = await testRedirect(inputUrl, rule);
 
       if (redirectedUrl) {
@@ -261,23 +257,20 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.set({redirectRules});
   }
 
-  // Add a button at the top to diagnose active rules
+  // Add a button to diagnose active rules
   function initDiagnosticTools() {
     const statsSection = document.querySelector('.stats');
     if (!statsSection) return;
     
-    // Add a diagnostic button
+    // Add diagnostic button
     const diagButton = document.createElement('button');
     diagButton.textContent = 'Diagnose Rules';
     diagButton.className = 'btn diag-btn';
     diagButton.style.marginLeft = '10px';
-    diagButton.style.backgroundColor = '#2196F3';
-    diagButton.style.color = 'white';
     diagButton.style.fontSize = '12px';
     diagButton.style.padding = '4px 8px';
     
-    diagButton.addEventListener('click', async () => {
-      // Get active rules from background
+    diagButton.addEventListener('click', () => {
       chrome.runtime.sendMessage({action: 'getActiveRules'}, (response) => {
         if (response.error) {
           alert(`Error: ${response.error}`);
@@ -285,88 +278,77 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         const rules = response.rules || [];
-        console.log('Active rules:', rules);
         
-        // Create a modal to display rules
-        const modal = document.createElement('div');
-        modal.style.position = 'fixed';
-        modal.style.top = '0';
-        modal.style.left = '0';
-        modal.style.width = '100%';
-        modal.style.height = '100%';
-        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        modal.style.zIndex = '1000';
-        modal.style.display = 'flex';
-        modal.style.justifyContent = 'center';
-        modal.style.alignItems = 'center';
+        // Create simple report
+        let report = `Active Rules: ${rules.length}\n\n`;
         
-        const content = document.createElement('div');
-        content.style.backgroundColor = 'white';
-        content.style.padding = '20px';
-        content.style.borderRadius = '5px';
-        content.style.maxWidth = '80%';
-        content.style.maxHeight = '80%';
-        content.style.overflow = 'auto';
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Close';
-        closeBtn.className = 'btn';
-        closeBtn.style.marginTop = '10px';
-        closeBtn.addEventListener('click', () => document.body.removeChild(modal));
-        
-        if (rules.length === 0) {
-          content.innerHTML = '<h3>No Active Rules</h3><p>There are no active redirect rules.</p>';
-        } else {
-          content.innerHTML = `<h3>Active Rules (${rules.length})</h3>`;
+        rules.forEach((rule) => {
+          report += `--- Rule ${rule.id} ---\n`;
           
-          const rulesList = document.createElement('ul');
-          rulesList.style.listStyle = 'none';
-          rulesList.style.padding = '0';
+          if (rule.condition.regexFilter) {
+            report += `Pattern: ${rule.condition.regexFilter}\n`;
+          } else if (rule.condition.urlFilter) {
+            report += `URL Filter: ${rule.condition.urlFilter}\n`;
+          }
           
-          rules.forEach(rule => {
-            const li = document.createElement('li');
-            li.style.marginBottom = '10px';
-            li.style.padding = '10px';
-            li.style.backgroundColor = '#f5f5f5';
-            li.style.borderRadius = '4px';
-            
-            let ruleText = `<strong>Rule ID: ${rule.id}</strong><br>`;
-            
-            if (rule.condition.regexFilter) {
-              ruleText += `Pattern: ${rule.condition.regexFilter}<br>`;
-            } else if (rule.condition.urlFilter) {
-              ruleText += `URL Filter: ${rule.condition.urlFilter}<br>`;
-            }
-            
-            if (rule.action.redirect.regexSubstitution) {
-              ruleText += `Redirect to: ${rule.action.redirect.regexSubstitution}<br>`;
-            } else if (rule.action.redirect.url) {
-              ruleText += `Redirect to: ${rule.action.redirect.url}<br>`;
-            }
-            
-            ruleText += `Resource Types: ${rule.condition.resourceTypes.join(', ')}`;
-            
-            li.innerHTML = ruleText;
-            rulesList.appendChild(li);
-          });
+          if (rule.action.redirect.regexSubstitution) {
+            report += `Redirect: ${rule.action.redirect.regexSubstitution}\n`;
+          } else if (rule.action.redirect.url) {
+            report += `Redirect: ${rule.action.redirect.url}\n`;
+          }
           
-          content.appendChild(rulesList);
-        }
+          report += `Resources: ${rule.condition.resourceTypes.join(', ')}\n\n`;
+        });
         
-        content.appendChild(closeBtn);
-        modal.appendChild(content);
-        document.body.appendChild(modal);
+        alert(report);
       });
     });
     
     statsSection.appendChild(diagButton);
   }
 
-  // Call this function after loading settings
-  document.addEventListener("DOMContentLoaded", () => {
-    // ...existing initialization code...
+  // Add debug toggle at the top
+  function initDebugToggle() {
+    const statsSection = document.querySelector('.stats');
+    if (!statsSection) return;
     
-    // Add diagnostic tools
-    setTimeout(initDiagnosticTools, 100);
-  });
+    const debugToggle = document.createElement('div');
+    debugToggle.style.display = 'flex';
+    debugToggle.style.alignItems = 'center';
+    debugToggle.style.marginLeft = '10px';
+    debugToggle.style.fontSize = '12px';
+    
+    const debugToggleLabel = document.createElement('label');
+    debugToggleLabel.className = 'switch';
+    debugToggleLabel.style.marginRight = '6px';
+    debugToggleLabel.style.transform = 'scale(0.8)';
+    
+    const debugToggleInput = document.createElement('input');
+    debugToggleInput.type = 'checkbox';
+    
+    const debugToggleSlider = document.createElement('span');
+    debugToggleSlider.className = 'slider round';
+    
+    const debugToggleText = document.createElement('span');
+    debugToggleText.textContent = 'Debug';
+    
+    debugToggleLabel.appendChild(debugToggleInput);
+    debugToggleLabel.appendChild(debugToggleSlider);
+    debugToggle.appendChild(debugToggleLabel);
+    debugToggle.appendChild(debugToggleText);
+    
+    statsSection.appendChild(debugToggle);
+    
+    // Toggle debug mode
+    debugToggleInput.addEventListener('change', () => {
+      chrome.runtime.sendMessage({
+        action: 'toggleDebugToPage',
+        enabled: debugToggleInput.checked
+      });
+    });
+  }
+
+  // Initialize diagnostic tools
+  initDiagnosticTools();
+  initDebugToggle();
 });
