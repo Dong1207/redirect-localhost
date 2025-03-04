@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Test if a URL would be redirected by a rule
   function testRedirect(inputUrl, rule) {
     if (!rule.fromUrl || !rule.toUrl) return null;
-    
+
     // Use the background script's matching logic for consistency
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
@@ -259,92 +259,116 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Add a button to diagnose active rules
   function initDiagnosticTools() {
-    const statsSection = document.querySelector('.stats');
+    const statsSection = document.querySelector(".stats");
     if (!statsSection) return;
-    
+
     // Add diagnostic button
-    const diagButton = document.createElement('button');
-    diagButton.textContent = 'Diagnose Rules';
-    diagButton.className = 'btn diag-btn';
-    diagButton.style.marginLeft = '10px';
-    diagButton.style.fontSize = '12px';
-    diagButton.style.padding = '4px 8px';
-    
-    diagButton.addEventListener('click', () => {
-      chrome.runtime.sendMessage({action: 'getActiveRules'}, (response) => {
+    const diagButton = document.createElement("button");
+    diagButton.textContent = "Diagnose Rules";
+    diagButton.className = "btn diag-btn";
+    diagButton.style.marginLeft = "10px";
+    diagButton.style.fontSize = "12px";
+    diagButton.style.padding = "4px 8px";
+
+    diagButton.addEventListener("click", () => {
+      chrome.runtime.sendMessage({action: "getActiveRules"}, (response) => {
         if (response.error) {
           alert(`Error: ${response.error}`);
           return;
         }
-        
+
         const rules = response.rules || [];
-        
+
         // Create simple report
         let report = `Active Rules: ${rules.length}\n\n`;
-        
+
         rules.forEach((rule) => {
           report += `--- Rule ${rule.id} ---\n`;
-          
+
           if (rule.condition.regexFilter) {
             report += `Pattern: ${rule.condition.regexFilter}\n`;
           } else if (rule.condition.urlFilter) {
             report += `URL Filter: ${rule.condition.urlFilter}\n`;
           }
-          
+
           if (rule.action.redirect.regexSubstitution) {
             report += `Redirect: ${rule.action.redirect.regexSubstitution}\n`;
           } else if (rule.action.redirect.url) {
             report += `Redirect: ${rule.action.redirect.url}\n`;
           }
-          
-          report += `Resources: ${rule.condition.resourceTypes.join(', ')}\n\n`;
+
+          report += `Resources: ${rule.condition.resourceTypes.join(", ")}\n\n`;
         });
-        
+
         alert(report);
       });
     });
-    
+
     statsSection.appendChild(diagButton);
   }
 
   // Add debug toggle at the top
   function initDebugToggle() {
-    const statsSection = document.querySelector('.stats');
+    const statsSection = document.querySelector(".stats");
     if (!statsSection) return;
-    
-    const debugToggle = document.createElement('div');
-    debugToggle.style.display = 'flex';
-    debugToggle.style.alignItems = 'center';
-    debugToggle.style.marginLeft = '10px';
-    debugToggle.style.fontSize = '12px';
-    
-    const debugToggleLabel = document.createElement('label');
-    debugToggleLabel.className = 'switch';
-    debugToggleLabel.style.marginRight = '6px';
-    debugToggleLabel.style.transform = 'scale(0.8)';
-    
-    const debugToggleInput = document.createElement('input');
-    debugToggleInput.type = 'checkbox';
-    
-    const debugToggleSlider = document.createElement('span');
-    debugToggleSlider.className = 'slider round';
-    
-    const debugToggleText = document.createElement('span');
-    debugToggleText.textContent = 'Debug';
-    
+
+    const debugToggle = document.createElement("div");
+    debugToggle.style.display = "flex";
+    debugToggle.style.alignItems = "center";
+    debugToggle.style.marginLeft = "10px";
+    debugToggle.style.fontSize = "12px";
+
+    const debugToggleLabel = document.createElement("label");
+    debugToggleLabel.className = "switch";
+    debugToggleLabel.style.marginRight = "6px";
+    debugToggleLabel.style.transform = "scale(0.8)";
+
+    const debugToggleInput = document.createElement("input");
+    debugToggleInput.type = "checkbox";
+    debugToggleInput.id = "debugToggle";
+
+    // Load the current debug state
+    chrome.storage.local.get(["debugToPage"], (result) => {
+      if (result.debugToPage === true) {
+        debugToggleInput.checked = true;
+      }
+    });
+
+    const debugToggleSlider = document.createElement("span");
+    debugToggleSlider.className = "slider round";
+
+    const debugToggleText = document.createElement("span");
+    debugToggleText.textContent = "Debug";
+
     debugToggleLabel.appendChild(debugToggleInput);
     debugToggleLabel.appendChild(debugToggleSlider);
     debugToggle.appendChild(debugToggleLabel);
     debugToggle.appendChild(debugToggleText);
-    
+
     statsSection.appendChild(debugToggle);
-    
+
     // Toggle debug mode
-    debugToggleInput.addEventListener('change', () => {
-      chrome.runtime.sendMessage({
-        action: 'toggleDebugToPage',
-        enabled: debugToggleInput.checked
-      });
+    debugToggleInput.addEventListener("change", () => {
+      const enabled = debugToggleInput.checked;
+      chrome.runtime.sendMessage(
+        {
+          action: "toggleDebugToPage",
+          enabled: enabled,
+        },
+        (response) => {
+          // Make sure the UI reflects the actual state in case permission was denied
+          if (
+            response &&
+            response.debugEnabled !== undefined &&
+            response.debugEnabled !== enabled
+          ) {
+            debugToggleInput.checked = response.debugEnabled;
+          }
+        }
+      );
+
+      // Save state to storage directly too (backup)
+      chrome.storage.local.set({debugToPage: enabled});
     });
   }
 

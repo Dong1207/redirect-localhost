@@ -4,40 +4,67 @@ let debugToPage = false;
 // Helper function to log to both extension console and optionally page console
 function debugLog(...args) {
   console.log(...args); // Always log to extension console
-  
+
   if (debugToPage) {
     // Try to log to the active tab's console
     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
       if (tabs[0]) {
         const tabId = tabs[0].id;
-        chrome.scripting.executeScript({
-          target: {tabId},
-          func: function(logArgs) {
-            console.log("[REDIRECT-EXTENSION]", ...logArgs);
-          },
-          args: [args]
-        }).catch(err => console.error("Failed to log to page console:", err));
+        chrome.scripting
+          .executeScript({
+            target: {tabId},
+            func: function (logArgs) {
+              console.log("[REDIRECT-EXTENSION]", ...logArgs);
+            },
+            args: [args],
+          })
+          .catch((err) => console.error("Failed to log to page console:", err));
       }
     });
   }
 }
 
-// Initialize the extension
+// Initialize the extension with better error handling
 chrome.runtime.onInstalled.addListener(() => {
   // Set default settings
   chrome.storage.local.get(
-    ["redirectRules", "enabled", "redirectCount"],
+    ["redirectRules", "enabled", "redirectCount", "debugToPage"],
     (result) => {
       if (!result.redirectRules) {
         chrome.storage.local.set({
           redirectRules: [],
           enabled: false,
           redirectCount: 0,
+          debugToPage: false,
         });
       } else {
-        // If we have existing data, restore the redirect count
+        // If we have existing data, restore the counts and settings
         redirectCount = result.redirectCount || 0;
+
+        // Restore debug mode with better error handling
+        if (result.debugToPage === true) {
+          chrome.permissions.contains(
+            {permissions: ["scripting"]},
+            async (hasPermission) => {
+              if (hasPermission) {
+                debugToPage = true;
+                try {
+                  await injectDebugScript();
+                } catch (error) {
+                  console.error("Failed to restore debug mode:", error);
+                  debugToPage = false;
+                  chrome.storage.local.set({debugToPage: false});
+                }
+              } else {
+                // If no permission, reset debug setting
+                debugToPage = false;
+                chrome.storage.local.set({debugToPage: false});
+              }
+            }
+          );
+        }
       }
+
       updateRedirectRules();
     }
   );
@@ -74,9 +101,18 @@ async function updateRedirectRules() {
       .map((rule, index) => {
         if (!rule.fromUrl || !rule.toUrl) return null;
 
-        const resourceTypes = rule.resourceTypes && rule.resourceTypes.length > 0
-          ? rule.resourceTypes
-          : ["main_frame", "sub_frame", "stylesheet", "script", "image", "xmlhttprequest", "other"];
+        const resourceTypes =
+          rule.resourceTypes && rule.resourceTypes.length > 0
+            ? rule.resourceTypes
+            : [
+                "main_frame",
+                "sub_frame",
+                "stylesheet",
+                "script",
+                "image",
+                "xmlhttprequest",
+                "other",
+              ];
 
         // Parse the wildcard in the from URL
         const fromUrl = rule.fromUrl;
@@ -196,14 +232,16 @@ chrome.webRequest?.onBeforeRedirect?.addListener(
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
     const requestUrl = info.request.url;
-    const redirectUrl = info.redirect ? info.redirect.url : "Unknown destination";
-    
+    const redirectUrl = info.redirect
+      ? info.redirect.url
+      : "Unknown destination";
+
     debugLog("Rule matched:", {
       url: requestUrl,
       redirectUrl: redirectUrl,
-      ruleId: info.rule.ruleId
+      ruleId: info.rule.ruleId,
     });
-    
+
     redirectCount++;
     chrome.storage.local.set({redirectCount});
   });
@@ -215,8 +253,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "getRedirectCount") {
     sendResponse({count: redirectCount});
     return true;
-  } 
-  
+  }
+
   // Test URL matching
   else if (message.action === "testUrlMatch") {
     const {inputUrl, rule} = message;
@@ -283,8 +321,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({matched: false, error: error.message});
     }
     return true;
-  } 
-  
+  }
+
   // Get active rules
   else if (message.action === "getActiveRules") {
     chrome.declarativeNetRequest
@@ -296,43 +334,101 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({error: error.message});
       });
     return true;
-  } 
-  
-  // Toggle debug to page
-  else if (message.action === "toggleDebugToPage") {
+  }
+
+  // Toggle debug to page - improved version
+  if (message.action === "toggleDebugToPage") {
+    const wasEnabled = debugToPage;
     debugToPage = message.enabled;
-    
-    if (debugToPage) {
-      // Request scripting permission if needed
-      chrome.permissions.request({
-        permissions: ["scripting"]
-      }, (granted) => {
-        if (granted) {
-          injectDebugScript();
-        } else {
-          debugToPage = false;
-          console.log("Scripting permission denied, debug to page disabled");
+
+    // Save debug state to storage
+    chrome.storage.local.set({debugToPage});
+
+    if (debugToPage && !wasEnabled) {
+      // Only request permission and inject script if we're enabling debugging
+      chrome.permissions.request(
+        {permissions: ["scripting"]},
+        async (granted) => {
+          if (granted) {
+            try {
+              await injectDebugScript();
+              sendResponse({success: true, debugEnabled: true});
+            } catch (error) {
+              console.error("Debug script injection error:", error);
+              debugToPage = false;
+              chrome.storage.local.set({debugToPage: false});
+              sendResponse({
+                success: false,
+                debugEnabled: false,
+                error: error.message,
+              });
+            }
+          } else {
+            debugToPage = false;
+            chrome.storage.local.set({debugToPage: false});
+            sendResponse({
+              success: false,
+              debugEnabled: false,
+              error: "Permission denied",
+            });
+          }
         }
-      });
+      );
+      return true; // Keep the message channel open for async response
+    } else if (!debugToPage && wasEnabled) {
+      // Disable debug mode and remove scripts
+      try {
+        chrome.scripting
+          .unregisterContentScripts({
+            ids: ["redirect-debug"],
+          })
+          .catch((err) =>
+            console.log("Failed to unregister debug script:", err)
+          );
+      } catch (error) {
+        console.log("Error removing debug script:", error);
+      }
     }
-    
-    sendResponse({success: true});
+
+    sendResponse({success: true, debugEnabled: debugToPage});
     return true;
   }
-  
+
   return true;
 });
 
-// Inject debug script
+// Inject debug script with proper handling of duplicates
 async function injectDebugScript() {
   try {
-    await chrome.scripting.registerContentScripts([{
-      id: "redirect-debug",
-      js: ["debug-inject.js"],
-      matches: ["<all_urls>"],
-      runAt: "document_start"
-    }]);
+    // First check if the script is already registered
+    const existingScripts = await chrome.scripting
+      .getRegisteredContentScripts({
+        ids: ["redirect-debug"],
+      })
+      .catch(() => []);
+
+    // If the script already exists, unregister it first
+    if (existingScripts && existingScripts.length > 0) {
+      await chrome.scripting.unregisterContentScripts({
+        ids: ["redirect-debug"],
+      });
+    }
+
+    // Now we can safely register the script
+    await chrome.scripting.registerContentScripts([
+      {
+        id: "redirect-debug",
+        js: ["debug-inject.js"],
+        matches: ["<all_urls>"],
+        runAt: "document_start",
+      },
+    ]);
+
+    console.log("Debug script successfully registered");
   } catch (error) {
     console.error("Failed to register debug script:", error);
+    // Reset debug mode if script registration fails
+    debugToPage = false;
+    chrome.storage.local.set({debugToPage: false});
   }
 }
