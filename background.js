@@ -76,77 +76,127 @@ async function updateRedirectRules() {
                 "other",
               ];
 
-        // Convert the rule with wildcards to a regex pattern
-        let urlFilter = rule.fromUrl;
-
         if (DEBUG) {
           console.log(
             `Processing rule ${index + 1}: ${rule.fromUrl} -> ${rule.toUrl}`
           );
         }
 
-        // Replace ** with a special marker that won't be escaped
-        urlFilter = urlFilter.replace(/\*\*/g, "DOUBLE_WILDCARD");
+        // Parse the wildcard in the from URL
+        const fromUrl = rule.fromUrl;
+        const toUrl = rule.toUrl;
+        const wildcardIndex = fromUrl.indexOf("**");
 
-        // Escape special regex characters
-        urlFilter = escapeRegExp(urlFilter);
-
-        // Replace the marker back with a proper wildcard pattern
-        urlFilter = urlFilter.replace(/DOUBLE_WILDCARD/g, ".*");
-
-        // Create the regexSubstitution pattern for the destination URL
-        let toUrl = rule.toUrl;
-
-        // Count wildcards in fromUrl
-        const wildcardCount = (rule.fromUrl.match(/\*\*/g) || []).length;
-
-        // Add detailed logging about wildcards
-        if (DEBUG) {
-          console.log(
-            `Rule ${index + 1} has ${wildcardCount} wildcards in fromUrl: ${
-              rule.fromUrl
-            }`
-          );
+        // No wildcard, use exact URL matching
+        if (wildcardIndex === -1) {
+          return {
+            id: index + 1,
+            priority: 1,
+            action: {
+              type: "redirect",
+              redirect: {url: toUrl},
+            },
+            condition: {
+              urlFilter: fromUrl,
+              resourceTypes: resourceTypes,
+            },
+          };
         }
 
-        // Replace wildcards in toUrl with capture groups
-        for (let i = 1; i <= wildcardCount; i++) {
-          const beforeReplace = toUrl;
-          toUrl = toUrl.replace(/\*\*/, `$${i}`);
+        // Split the URL into prefix and suffix
+        const prefix = fromUrl.substring(0, wildcardIndex);
+        const suffix = fromUrl.substring(wildcardIndex + 2);
 
-          if (DEBUG && beforeReplace !== toUrl) {
+        // Find the wildcard position in the target URL
+        const targetWildcardIndex = toUrl.indexOf("**");
+
+        // If no wildcard in target URL, we can't perform a wildcard substitution
+        if (targetWildcardIndex === -1) {
+          if (DEBUG) {
             console.log(
-              `Replaced wildcard in toUrl: "${beforeReplace}" -> "${toUrl}"`
+              `Rule ${index + 1}: Target URL has no wildcard, using direct URL`
             );
+          }
+
+          return {
+            id: index + 1,
+            priority: 1,
+            action: {
+              type: "redirect",
+              redirect: {url: toUrl},
+            },
+            condition: {
+              urlFilter: fromUrl.replace("**", "*"), // Simple wildcard for matching
+              resourceTypes: resourceTypes,
+            },
+          };
+        }
+
+        // If both URLs have wildcards, we can use regex substitution
+        const targetPrefix = toUrl.substring(0, targetWildcardIndex);
+        const targetSuffix = toUrl.substring(targetWildcardIndex + 2);
+
+        // Create a regex pattern with non-greedy matching to capture the wildcard part
+        let regexPattern;
+        if (suffix) {
+          // If there's a suffix, we need to capture everything between prefix and suffix
+          regexPattern = escapeRegExp(prefix) + "(.*?)" + escapeRegExp(suffix);
+        } else {
+          // If no suffix, capture everything after the prefix
+          regexPattern = escapeRegExp(prefix) + "(.*)";
+        }
+
+        // The substitution pattern
+        const regexSubstitution = targetPrefix + "$1" + targetSuffix;
+
+        if (DEBUG) {
+          console.log(`Rule ${index + 1} detailed pattern:`, {
+            fromUrl,
+            toUrl,
+            prefix,
+            suffix,
+            targetPrefix,
+            targetSuffix,
+            regexPattern,
+            regexSubstitution,
+          });
+
+          // Test the pattern with a sample URL to verify
+          try {
+            const testUrl = fromUrl.replace("**", "test-content");
+            const testRegex = new RegExp(regexPattern);
+            const match = testRegex.exec(testUrl);
+            console.log(`Test matching: ${testUrl} against ${regexPattern}`, {
+              matches: !!match,
+              capture: match ? match[1] : null,
+              result: match
+                ? testUrl.replace(testRegex, regexSubstitution)
+                : null,
+            });
+          } catch (e) {
+            console.error("Error testing regex pattern:", e);
           }
         }
 
-        if (DEBUG) {
-          console.log(`Rule ${index + 1} regex:`, {
-            regexFilter: urlFilter,
-            regexSubstitution: toUrl,
-          });
-        }
-
         return {
-          id: index + 1, // Rule IDs start from 1
+          id: index + 1,
           priority: 1,
           action: {
             type: "redirect",
             redirect: {
-              regexSubstitution: toUrl,
+              regexSubstitution: regexSubstitution,
             },
           },
           condition: {
-            regexFilter: urlFilter,
+            regexFilter: regexPattern,
             resourceTypes: resourceTypes,
           },
         };
       })
-      .filter(Boolean); // Remove any null entries
+      .filter(Boolean);
 
     if (DEBUG) {
-      console.log("New rules to apply:", newRules);
+      console.log("New rules to apply:", JSON.stringify(newRules, null, 2));
     }
 
     // Update the rules
@@ -190,20 +240,31 @@ chrome.webRequest?.onBeforeRedirect?.addListener(
 // Enhanced logging for rule matching
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
-    console.log("Rule matched:", info);
-    console.log(
-      `Redirect detected: ${info.request.url} -> ${
-        info.redirect?.url || "Unknown destination"
-      }`
-    );
+    const requestUrl = info.request.url;
+    const redirectUrl = info.redirect
+      ? info.redirect.url
+      : "Unknown destination";
 
-    // Try to find the rule that matched
+    console.log("Rule matched:", info);
+    console.log(`Redirect detected: ${requestUrl} -> ${redirectUrl}`);
+
+    // Try to find the rule that matched and log detailed info
     chrome.declarativeNetRequest
       .getDynamicRules()
       .then((rules) => {
         const matchedRule = rules.find((rule) => rule.id === info.rule.ruleId);
         if (matchedRule) {
           console.log("Matched rule details:", matchedRule);
+
+          // For regex rules, test the matching manually to debug
+          if (matchedRule.condition.regexFilter) {
+            const regex = new RegExp(matchedRule.condition.regexFilter);
+            const match = regex.exec(requestUrl);
+            console.log("Regex test results:", {
+              matches: !!match,
+              captureGroups: match ? match.slice(1) : [],
+            });
+          }
         }
       })
       .catch((err) => console.error("Error fetching rule details:", err));
@@ -220,41 +281,87 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "testUrlMatch") {
     const {inputUrl, rule} = message;
     try {
-      // Create same pattern used in declarativeNetRequest rules
-      let urlFilterPattern = rule.fromUrl;
-      urlFilterPattern = urlFilterPattern.replace(/\*\*/g, "DOUBLE_WILDCARD");
-      urlFilterPattern = escapeRegExp(urlFilterPattern);
-      urlFilterPattern = urlFilterPattern.replace(/DOUBLE_WILDCARD/g, "(.*)");
+      const fromUrl = rule.fromUrl;
+      const toUrl = rule.toUrl;
+      const wildcardIndex = fromUrl.indexOf("**");
 
-      const regex = new RegExp(urlFilterPattern);
-      console.log(
-        `Testing URL: ${inputUrl} against pattern: ${urlFilterPattern}`
-      );
+      // No wildcard in from URL
+      if (wildcardIndex === -1) {
+        const matches = inputUrl === fromUrl;
+        sendResponse({matched: matches, redirectUrl: matches ? toUrl : null});
+        return true;
+      }
 
-      const match = inputUrl.match(regex);
+      // Parse the wildcard pattern
+      const prefix = fromUrl.substring(0, wildcardIndex);
+      const suffix = fromUrl.substring(wildcardIndex + 2);
 
-      if (!match) {
-        console.log("No match found");
+      // Check if URL matches the pattern
+      if (!inputUrl.startsWith(prefix)) {
+        console.log(`URL doesn't start with prefix: ${prefix}`);
         sendResponse({matched: false});
         return true;
       }
 
-      // Extract captured groups
-      const captures = match.slice(1);
-      console.log("Captured groups:", captures);
+      // If there's a suffix, ensure the URL ends with it
+      if (suffix && !inputUrl.endsWith(suffix)) {
+        console.log(`URL doesn't end with suffix: ${suffix}`);
+        sendResponse({matched: false});
+        return true;
+      }
 
-      // Create destination URL
-      let toUrl = rule.toUrl;
-      captures.forEach((capture, i) => {
-        toUrl = toUrl.replace(/\*\*/, capture);
+      // Extract the wildcard content
+      let wildcardContent;
+      if (suffix) {
+        const startPos = prefix.length;
+        const endPos = inputUrl.length - suffix.length;
+        wildcardContent = inputUrl.substring(startPos, endPos);
+      } else {
+        wildcardContent = inputUrl.substring(prefix.length);
+      }
+
+      // Check if target URL has a wildcard
+      const targetWildcardIndex = toUrl.indexOf("**");
+      let resultUrl;
+
+      if (targetWildcardIndex === -1) {
+        // No wildcard in target URL, use as-is
+        resultUrl = toUrl;
+      } else {
+        // Replace the wildcard in target URL with captured content
+        resultUrl =
+          toUrl.substring(0, targetWildcardIndex) +
+          wildcardContent +
+          toUrl.substring(targetWildcardIndex + 2);
+      }
+
+      console.log({
+        prefix,
+        suffix,
+        wildcardContent,
+        resultUrl,
       });
 
-      console.log("Redirected URL would be:", toUrl);
-      sendResponse({matched: true, redirectUrl: toUrl, captures: captures});
+      sendResponse({
+        matched: true,
+        redirectUrl: resultUrl,
+        wildcardContent,
+      });
     } catch (error) {
       console.error("Error testing URL match:", error);
       sendResponse({matched: false, error: error.message});
     }
+    return true;
+  } else if (message.action === "getActiveRules") {
+    // Added functionality to inspect active rules
+    chrome.declarativeNetRequest
+      .getDynamicRules()
+      .then((rules) => {
+        sendResponse({rules});
+      })
+      .catch((error) => {
+        sendResponse({error: error.message});
+      });
     return true;
   }
   return true;

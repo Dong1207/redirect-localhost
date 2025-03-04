@@ -63,54 +63,25 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!rule.fromUrl || !rule.toUrl) return null;
 
     console.log(`Testing: ${inputUrl} against rule:`, rule);
-
-    // Convert the rule pattern to a regular expression
-    let fromPattern = rule.fromUrl.replace(/\*\*/g, "(.*)");
-    fromPattern = fromPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-    fromPattern = fromPattern.replace(/\\\(\\\.\\\*\\\)/g, "(.*)");
-
-    console.log("Testing with regex pattern:", fromPattern);
-
-    // Remove the strict anchors (^ and $) to allow partial matches
-    const regex = new RegExp(fromPattern);
-    console.log("Regex object:", regex);
-
-    const match = inputUrl.match(regex);
-    console.log("Match result:", match);
-
-    if (!match) {
-      // Try alternative matching with background script
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            action: "testUrlMatch",
-            inputUrl: inputUrl,
-            rule: rule,
-          },
-          (response) => {
-            console.log("Background match test response:", response);
-            if (response && response.matched) {
-              resolve(response.redirectUrl);
-            } else {
-              resolve(null);
-            }
+    
+    // Always use the background script's matching logic for consistency
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          action: "testUrlMatch",
+          inputUrl: inputUrl,
+          rule: rule,
+        },
+        (response) => {
+          console.log("Background match test response:", response);
+          if (response && response.matched) {
+            resolve(response.redirectUrl);
+          } else {
+            resolve(null);
           }
-        );
-      });
-    }
-
-    // Extract captured groups (the ** matches)
-    const captures = match.slice(1);
-    console.log("Captured groups:", captures);
-
-    // Replace ** in toUrl with captured values
-    let result = rule.toUrl;
-    captures.forEach((capture) => {
-      result = result.replace(/\*\*/, capture);
+        }
+      );
     });
-
-    console.log("Result URL:", result);
-    return result;
   }
 
   // Create a rule element from template
@@ -289,4 +260,113 @@ document.addEventListener("DOMContentLoaded", () => {
   function saveRules() {
     chrome.storage.local.set({redirectRules});
   }
+
+  // Add a button at the top to diagnose active rules
+  function initDiagnosticTools() {
+    const statsSection = document.querySelector('.stats');
+    if (!statsSection) return;
+    
+    // Add a diagnostic button
+    const diagButton = document.createElement('button');
+    diagButton.textContent = 'Diagnose Rules';
+    diagButton.className = 'btn diag-btn';
+    diagButton.style.marginLeft = '10px';
+    diagButton.style.backgroundColor = '#2196F3';
+    diagButton.style.color = 'white';
+    diagButton.style.fontSize = '12px';
+    diagButton.style.padding = '4px 8px';
+    
+    diagButton.addEventListener('click', async () => {
+      // Get active rules from background
+      chrome.runtime.sendMessage({action: 'getActiveRules'}, (response) => {
+        if (response.error) {
+          alert(`Error: ${response.error}`);
+          return;
+        }
+        
+        const rules = response.rules || [];
+        console.log('Active rules:', rules);
+        
+        // Create a modal to display rules
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        modal.style.zIndex = '1000';
+        modal.style.display = 'flex';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        
+        const content = document.createElement('div');
+        content.style.backgroundColor = 'white';
+        content.style.padding = '20px';
+        content.style.borderRadius = '5px';
+        content.style.maxWidth = '80%';
+        content.style.maxHeight = '80%';
+        content.style.overflow = 'auto';
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.className = 'btn';
+        closeBtn.style.marginTop = '10px';
+        closeBtn.addEventListener('click', () => document.body.removeChild(modal));
+        
+        if (rules.length === 0) {
+          content.innerHTML = '<h3>No Active Rules</h3><p>There are no active redirect rules.</p>';
+        } else {
+          content.innerHTML = `<h3>Active Rules (${rules.length})</h3>`;
+          
+          const rulesList = document.createElement('ul');
+          rulesList.style.listStyle = 'none';
+          rulesList.style.padding = '0';
+          
+          rules.forEach(rule => {
+            const li = document.createElement('li');
+            li.style.marginBottom = '10px';
+            li.style.padding = '10px';
+            li.style.backgroundColor = '#f5f5f5';
+            li.style.borderRadius = '4px';
+            
+            let ruleText = `<strong>Rule ID: ${rule.id}</strong><br>`;
+            
+            if (rule.condition.regexFilter) {
+              ruleText += `Pattern: ${rule.condition.regexFilter}<br>`;
+            } else if (rule.condition.urlFilter) {
+              ruleText += `URL Filter: ${rule.condition.urlFilter}<br>`;
+            }
+            
+            if (rule.action.redirect.regexSubstitution) {
+              ruleText += `Redirect to: ${rule.action.redirect.regexSubstitution}<br>`;
+            } else if (rule.action.redirect.url) {
+              ruleText += `Redirect to: ${rule.action.redirect.url}<br>`;
+            }
+            
+            ruleText += `Resource Types: ${rule.condition.resourceTypes.join(', ')}`;
+            
+            li.innerHTML = ruleText;
+            rulesList.appendChild(li);
+          });
+          
+          content.appendChild(rulesList);
+        }
+        
+        content.appendChild(closeBtn);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+      });
+    });
+    
+    statsSection.appendChild(diagButton);
+  }
+
+  // Call this function after loading settings
+  document.addEventListener("DOMContentLoaded", () => {
+    // ...existing initialization code...
+    
+    // Add diagnostic tools
+    setTimeout(initDiagnosticTools, 100);
+  });
 });
