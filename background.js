@@ -96,8 +96,9 @@ async function updateRedirectRules() {
       return;
     }
 
-    // Create new rules
+    // Create new rules - filter out disabled rules
     const newRules = redirectRules
+      .filter((rule) => !rule.disabled) // Skip disabled rules
       .map((rule, index) => {
         if (!rule.fromUrl || !rule.toUrl) return null;
         console.log("rule", rule);

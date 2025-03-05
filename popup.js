@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const checkRulesBtn = document.getElementById("checkRulesBtn");
   const testCurrentPageBtn = document.getElementById("testCurrentPageBtn");
   const exportRulesBtn = document.getElementById("exportRulesBtn");
+  const importRulesBtn = document.getElementById("importRulesBtn");
   const testUrlInput = document.getElementById("testUrlInput");
   const testUrlBtn = document.getElementById("testUrlBtn");
   const testUrlResult = document.getElementById("testUrlResult");
@@ -37,6 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkRulesBtn.addEventListener("click", checkActiveRules);
   testCurrentPageBtn.addEventListener("click", testCurrentPageUrl);
   exportRulesBtn.addEventListener("click", exportRules);
+  importRulesBtn.addEventListener("click", importRules);
   testUrlBtn.addEventListener("click", testUrl);
 
   // Set up debug toggle
@@ -142,6 +144,11 @@ document.addEventListener("DOMContentLoaded", () => {
     fromUrlInput.value = rule.fromUrl || "";
     toUrlInput.value = rule.toUrl || "";
 
+    // Handle disabled state if it exists in the rule
+    if (rule.disabled === true) {
+      ruleItem.dataset.disabled = "true";
+    }
+
     // Update rule title
     updateRuleTitle(ruleItem, rule);
 
@@ -152,6 +159,21 @@ document.addEventListener("DOMContentLoaded", () => {
         cb.checked = rule.resourceTypes.includes(cb.value);
       });
     }
+
+    // Add advanced options toggle
+    const advancedBtn = ruleItem.querySelector(".advanced-btn");
+    const advancedSections = ruleItem.querySelector(".advanced-sections");
+
+    advancedBtn.addEventListener("click", () => {
+      if (advancedSections.style.display === "none") {
+        advancedSections.style.display = "block";
+        advancedBtn.innerHTML =
+          '<i class="fas fa-cog"></i> Hide Advanced Options';
+      } else {
+        advancedSections.style.display = "none";
+        advancedBtn.innerHTML = '<i class="fas fa-cog"></i> Advanced Options';
+      }
+    });
 
     // Add event listeners to inputs for saving changes
     fromUrlInput.addEventListener("change", () => {
@@ -184,6 +206,29 @@ document.addEventListener("DOMContentLoaded", () => {
     resourceCheckboxes.forEach((checkbox) => {
       checkbox.addEventListener("change", () => updateRule(index));
     });
+
+    // Add toggle active button functionality
+    const toggleActiveBtn = ruleItem.querySelector(".toggle-active-btn");
+    toggleActiveBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isCurrentlyDisabled = rule.disabled === true;
+      rule.disabled = !isCurrentlyDisabled;
+      ruleItem.dataset.disabled = (!isCurrentlyDisabled).toString();
+      toggleActiveBtn.classList.toggle("inactive", !isCurrentlyDisabled);
+      toggleActiveBtn.title = isCurrentlyDisabled
+        ? "Disable Rule"
+        : "Enable Rule";
+      updateRule(index);
+    });
+
+    // Set initial button state
+    if (rule.disabled) {
+      toggleActiveBtn.classList.add("inactive");
+      toggleActiveBtn.title = "Enable Rule";
+    } else {
+      toggleActiveBtn.classList.remove("inactive");
+      toggleActiveBtn.title = "Disable Rule";
+    }
 
     // Add delete button functionality
     ruleItem.querySelector(".delete-btn").addEventListener("click", (e) => {
@@ -296,6 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const fromUrl = ruleElement.querySelector(".from-url-input").value;
     const toUrl = ruleElement.querySelector(".to-url-input").value;
+    const isDisabled = ruleElement.dataset.disabled === "true";
 
     // Get selected resource types
     const resourceCheckboxes = ruleElement.querySelectorAll(
@@ -308,6 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
       fromUrl,
       toUrl,
       resourceTypes,
+      disabled: isDisabled,
     };
 
     saveRules();
@@ -328,16 +375,26 @@ document.addEventListener("DOMContentLoaded", () => {
   // Update rule status indicator
   function updateRuleStatus(ruleElement, rule, isEnabled) {
     const statusIndicator = ruleElement.querySelector(".rule-status");
-    if (isEnabled && rule.fromUrl && rule.toUrl) {
+
+    // Check if the rule is disabled specifically
+    const isRuleActive =
+      !rule.disabled && isEnabled && rule.fromUrl && rule.toUrl;
+
+    if (isRuleActive) {
       statusIndicator.classList.add("active");
       statusIndicator.classList.remove("inactive");
       statusIndicator.title = "Rule is active";
     } else {
       statusIndicator.classList.add("inactive");
       statusIndicator.classList.remove("active");
-      statusIndicator.title = isEnabled
-        ? "Rule is incomplete (missing URL)"
-        : "Extension is disabled";
+
+      if (rule.disabled) {
+        statusIndicator.title = "Rule is disabled";
+      } else if (!isEnabled) {
+        statusIndicator.title = "Extension is disabled";
+      } else {
+        statusIndicator.title = "Rule is incomplete (missing URL)";
+      }
     }
   }
 
@@ -540,7 +597,126 @@ document.addEventListener("DOMContentLoaded", () => {
     a.href = url;
     a.click();
 
+    // Show success message
+    const toolsTab = document.getElementById("toolsTab");
+    const successMsg = document.createElement("div");
+    successMsg.className = "import-export-status success";
+    successMsg.textContent = "Rules exported successfully!";
+    toolsTab.appendChild(successMsg);
+
+    // Remove the message after a delay
+    setTimeout(() => {
+      if (toolsTab.contains(successMsg)) {
+        toolsTab.removeChild(successMsg);
+      }
+    }, 3000);
+
     setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+
+  function importRules() {
+    // Create a hidden file input element
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "application/json";
+    fileInput.style.display = "none";
+    document.body.appendChild(fileInput);
+
+    // Trigger the file selection dialog
+    fileInput.click();
+
+    // Handle file selection
+    fileInput.addEventListener("change", function () {
+      const file = fileInput.files[0];
+      if (!file) {
+        document.body.removeChild(fileInput);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const importedRules = JSON.parse(e.target.result);
+
+          // Validate imported rules
+          if (!Array.isArray(importedRules)) {
+            showImportStatus(
+              "Invalid file format. Expected an array of rules.",
+              false
+            );
+            document.body.removeChild(fileInput);
+            return;
+          }
+
+          // Process and validate each rule
+          const validRules = importedRules.filter((rule) => {
+            return (
+              rule &&
+              typeof rule === "object" &&
+              typeof rule.fromUrl === "string" &&
+              typeof rule.toUrl === "string" &&
+              (!rule.resourceTypes || Array.isArray(rule.resourceTypes))
+            );
+          });
+
+          if (validRules.length === 0) {
+            showImportStatus("No valid rules found in the file.", false);
+            document.body.removeChild(fileInput);
+            return;
+          }
+
+          // Always append new rules to existing ones (no option to replace)
+          redirectRules = redirectRules.concat(validRules);
+
+          // Save and update UI
+          saveRules();
+          displayRules();
+          showImportStatus(
+            `Successfully imported ${validRules.length} rules!`,
+            true
+          );
+        } catch (error) {
+          console.error("Error parsing imported rules:", error);
+          showImportStatus(`Error importing rules: ${error.message}`, false);
+        } finally {
+          document.body.removeChild(fileInput);
+        }
+      };
+
+      reader.onerror = function () {
+        showImportStatus("Error reading file", false);
+        document.body.removeChild(fileInput);
+      };
+
+      reader.readAsText(file);
+    });
+
+    // Handle cancel
+    window.addEventListener("focus", function focusHandler() {
+      setTimeout(() => {
+        if (document.body.contains(fileInput) && !fileInput.files.length) {
+          document.body.removeChild(fileInput);
+        }
+        window.removeEventListener("focus", focusHandler);
+      }, 300);
+    });
+  }
+
+  function showImportStatus(message, isSuccess) {
+    const toolsTab = document.getElementById("toolsTab");
+    const statusElement = document.createElement("div");
+    statusElement.className = `import-export-status ${
+      isSuccess ? "success" : "error"
+    }`;
+    statusElement.textContent = message;
+    toolsTab.appendChild(statusElement);
+
+    // Remove the message after a delay
+    setTimeout(() => {
+      if (toolsTab.contains(statusElement)) {
+        toolsTab.removeChild(statusElement);
+      }
+    }, 5000);
   }
 
   function testUrl() {
