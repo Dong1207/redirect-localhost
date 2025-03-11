@@ -23,9 +23,6 @@
           <button id="debugBtn" class="btn controls__btn">
             <i class="fas fa-bug"></i> Debug
           </button>
-          <button id="diagBtn" class="btn controls__btn">
-            <i class="fas fa-stethoscope"></i> Diagnose
-          </button>
         </div>
       </div>
 
@@ -37,7 +34,7 @@
       <div id="debugPanel" class="debug hidden">
         <div class="debug__tabs">
           <div class="debug__tab debug__tab--active" data-tab="history">Redirect History</div>
-          <div class="debug__tab" data-tab="tools">Debug Tools</div>
+          <div class="debug__tab" data-tab="tools">Import/Export</div>
         </div>
 
         <div id="historyTab" class="debug__content debug__content--active">
@@ -59,12 +56,6 @@
         </div>
 
         <div id="toolsTab" class="debug__content">
-          <div class="tools__item">
-            <button id="checkRulesBtn" class="btn tools__btn">
-              <i class="fas fa-list"></i> Check Active Rules
-            </button>
-          </div>
-
           <div class="import-export">
             <button id="exportRulesBtn" class="btn import-export__btn btn--primary">
               <i class="fas fa-download"></i> Export Rules

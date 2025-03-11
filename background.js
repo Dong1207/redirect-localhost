@@ -297,17 +297,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     },
 
-    // Get diagnostic information
-    getDiagnosticInfo: async () => {
-      try {
-        const rules = await chrome.declarativeNetRequest.getDynamicRules();
-        const enabled = await chrome.storage.local.get(["enabled"]).then(result => result.enabled || false);
-        return {rules, enabled};
-      } catch (error) {
-        return {error: error.message};
-      }
-    },
-
     // Toggle debug to page console
     toggleDebugToPage: () => handleDebugToggle(message.enabled),
   };

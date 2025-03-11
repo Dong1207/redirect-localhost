@@ -7,17 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
     addRuleBtn: document.getElementById("addRuleBtn"),
     ruleTemplate: document.getElementById("ruleTemplate"),
     debugBtn: document.getElementById("debugBtn"),
-    diagBtn: document.getElementById("diagBtn"),
     debugPanel: document.getElementById("debugPanel"),
     debugToPageToggle: document.getElementById("debugToPageToggle"),
     clearHistoryBtn: document.getElementById("clearHistoryBtn"),
-    checkRulesBtn: document.getElementById("checkRulesBtn"),
-    testCurrentPageBtn: document.getElementById("testCurrentPageBtn"),
     exportRulesBtn: document.getElementById("exportRulesBtn"),
     importRulesBtn: document.getElementById("importRulesBtn"),
-    testUrlInput: document.getElementById("testUrlInput"),
-    testUrlBtn: document.getElementById("testUrlBtn"),
-    testUrlResult: document.getElementById("testUrlResult"),
     tabs: document.querySelectorAll(".debug__tab"),
     tabContents: document.querySelectorAll(".debug__content"),
     redirectHistory: document.getElementById("redirectHistory"),
@@ -353,7 +347,6 @@ class PopupUI {
     this.elements.enableToggle.addEventListener("change", () => this.toggleRedirect());
     this.elements.addRuleBtn.addEventListener("click", () => this.addNewRule());
     this.elements.debugBtn.addEventListener("click", () => this.toggleDebugPanel());
-    this.elements.diagBtn.addEventListener("click", () => this.showDiagnosticDialog());
 
     // Add new section button
     const addSectionBtn = document.createElement("button");
@@ -370,7 +363,6 @@ class PopupUI {
 
     // Debug panel event listeners
     this.elements.clearHistoryBtn.addEventListener("click", () => this.clearRedirectHistory());
-    this.elements.checkRulesBtn.addEventListener("click", () => this.checkActiveRules());
     this.elements.exportRulesBtn.addEventListener("click", () => this.exportRules());
     this.elements.importRulesBtn.addEventListener("click", () => this.importRules());
     
@@ -393,14 +385,6 @@ class PopupUI {
         }
       );
       chrome.storage.local.set({ debugToPage: enabled });
-    });
-
-    // Tab navigation
-    this.elements.tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        const tabId = tab.dataset.tab;
-        this.activateTab(tabId);
-      });
     });
   }
 
@@ -1033,117 +1017,6 @@ class PopupUI {
     setTimeout(() => {
       statusElement.remove();
     }, 5000);
-  }
-
-  /**
-   * Show diagnostic dialog with active rules
-   */
-  showDiagnosticDialog() {
-    chrome.runtime.sendMessage({ action: "getDiagnosticInfo" }, (response) => {
-      if (!response || !response.rules) {
-        alert("Could not retrieve diagnostic information.");
-        return;
-      }
-
-      const { rules, enabled } = response;
-      let report = `Redirect Status: ${enabled ? "Enabled" : "Disabled"}\n`;
-      report += `Active Rules: ${rules.length}\n\n`;
-
-      rules.forEach((rule) => {
-        report += `Rule ID: ${rule.id}\n`;
-        
-        if (rule.condition.urlFilter) {
-          report += `Pattern: ${rule.condition.urlFilter}\n`;
-        } else if (rule.condition.regexFilter) {
-          report += `Regex: ${rule.condition.regexFilter}\n`;
-        }
-
-        if (rule.action.redirect.regexSubstitution) {
-          report += `Redirect: ${rule.action.redirect.regexSubstitution}\n`;
-        } else if (rule.action.redirect.url) {
-          report += `Redirect: ${rule.action.redirect.url}\n`;
-        }
-
-        report += `\n`;
-      });
-
-      // Create a more stylish alert dialog using BEM classes
-      const overlay = document.createElement("div");
-      overlay.className = "dialog-overlay";
-      
-      const dialog = document.createElement("div");
-      dialog.className = "dialog";
-      
-      const heading = document.createElement("h3");
-      heading.className = "dialog__heading";
-      heading.textContent = "Diagnostic Information";
-      
-      const content = document.createElement("div");
-      content.className = "dialog__content";
-      
-      const pre = document.createElement("pre");
-      pre.className = "dialog__pre";
-      pre.textContent = report;
-      content.appendChild(pre);
-      
-      const closeBtn = document.createElement("button");
-      closeBtn.className = "btn dialog__btn";
-      closeBtn.textContent = "Close";
-      closeBtn.addEventListener("click", () => {
-        document.body.removeChild(overlay);
-      });
-      
-      dialog.appendChild(heading);
-      dialog.appendChild(content);
-      dialog.appendChild(closeBtn);
-      
-      overlay.appendChild(dialog);
-      document.body.appendChild(overlay);
-    });
-  }
-
-  /**
-   * Check active rules in the browser
-   */
-  checkActiveRules() {
-    chrome.runtime.sendMessage({ action: "getActiveRules" }, (response) => {
-      if (response.error) {
-        this.elements.testUrlResult.innerHTML = `<div class="test-result error">${response.error}</div>`;
-        this.elements.testUrlResult.style.display = "block";
-        return;
-      }
-
-      const rules = response.rules || [];
-      let html = `<div class="test-result"><strong>${rules.length} Active Rules</strong><br>`;
-
-      if (rules.length === 0) {
-        html += "No active rules found. Add rules and enable the extension.";
-      } else {
-        rules.forEach((rule) => {
-          let pattern =
-            rule.condition.regexFilter ||
-            rule.condition.urlFilter ||
-            "Unknown pattern";
-          let redirect =
-            rule.action.redirect.regexSubstitution ||
-            rule.action.redirect.url ||
-            "Unknown destination";
-
-          html += `<div class="rule-info">
-            <strong class="rule-info__id">Rule ${rule.id}</strong>
-            <div class="rule-info__detail">Pattern: ${pattern}</div>
-            <div class="rule-info__detail">Redirect: ${redirect}</div>
-          </div>`;
-        });
-      }
-
-      html += "</div>";
-
-      // Show in the test tab
-      document.querySelector('.tab[data-tab="test"]').click();
-      this.elements.testUrlResult.innerHTML = html;
-      this.elements.testUrlResult.style.display = "block";
-    });
   }
 
   /**

@@ -180,16 +180,6 @@ body {
     margin-top: 8px;
 }
 
-/* Tool buttons */
-.tools__item {
-    margin-bottom: 8px;
-}
-
-.tools__btn {
-    width: 100%;
-    padding: 6px 10px;
-}
-
 /* Import/Export controls */
 .import-export {
     display: flex;
@@ -596,24 +586,6 @@ input:checked+.slider:before {
 
 .dialog__btn:hover {
     background: #0b7dda;
-}
-
-/* Rule info display */
-.rule-info {
-    margin-top: 8px;
-    padding: 5px;
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.rule-info__id {
-    display: block;
-    margin-bottom: 4px;
-}
-
-.rule-info__detail {
-    font-size: 12px;
-    margin-bottom: 2px;
 }
 
 /* Sections container */
