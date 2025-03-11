@@ -1,3 +1,5 @@
+import { DOM, URLUtils } from './utils.js';
+
 document.addEventListener("DOMContentLoaded", () => {
   // Cache DOM elements for better performance
   const elements = {
@@ -126,21 +128,21 @@ class RuleManager {
 
         this.enabled = result.enabled || false;
         this.sections = result.sections || {};
-        
+
         // Ensure all rules have a section
         this.rules.forEach(rule => {
           if (!rule.section) {
             rule.section = "Default";
           }
         });
-        
+
         // Initialize sections from rules if not already in storage
         this.rules.forEach(rule => {
           if (rule.section && !this.sections.hasOwnProperty(rule.section)) {
             this.sections[rule.section] = { enabled: true };
           }
         });
-        
+
         // Ensure there's at least one section
         if (Object.keys(this.sections).length === 0 && this.rules.length > 0) {
           this.sections["Default"] = { enabled: true };
@@ -148,7 +150,7 @@ class RuleManager {
             rule.section = "Default";
           });
         }
-        
+
         resolve();
       });
     });
@@ -195,7 +197,7 @@ class RuleManager {
   getSections() {
     // Get all sections defined in this.sections
     const definedSections = Object.keys(this.sections);
-    
+
     // Get all sections used in rules
     const sectionSet = new Set(definedSections);
     this.rules.forEach(rule => {
@@ -203,10 +205,10 @@ class RuleManager {
         sectionSet.add(rule.section);
       }
     });
-    
+
     return Array.from(sectionSet);
   }
-  
+
   /**
    * Get rules for a specific section
    * @param {string} sectionName - Name of the section
@@ -215,7 +217,7 @@ class RuleManager {
   getRulesBySection(sectionName) {
     return this.rules.filter(rule => rule.section === sectionName);
   }
-  
+
   /**
    * Set section enabled state
    * @param {string} sectionName - Name of the section
@@ -227,7 +229,7 @@ class RuleManager {
     }
     this.sections[sectionName].enabled = enabled;
   }
-  
+
   /**
    * Check if a section is enabled
    * @param {string} sectionName - Name of the section
@@ -236,7 +238,7 @@ class RuleManager {
   isSectionEnabled(sectionName) {
     return this.sections[sectionName]?.enabled !== false;
   }
-  
+
   /**
    * Enable or disable all rules in a section
    * @param {string} sectionName - Name of the section
@@ -315,8 +317,8 @@ class RuleManager {
         return;
       }
 
-        const result = rule.testUrl(url);
-        if (result.matches) {
+      const result = rule.testUrl(url);
+      if (result.matches) {
         matches.push({
           rule,
           index,
@@ -345,7 +347,7 @@ class PopupUI {
     await this.updateRedirectCount();
     this.setupEventListeners();
     this.setupTabs();
-    
+
     // Display sections (which will contain rules)
     this.displaySections();
     this.loadRedirectHistory();
@@ -430,12 +432,12 @@ class PopupUI {
   async addNewRule() {
     // Check if there are any sections
     const sections = this.ruleManager.getSections();
-    
+
     if (sections.length === 0) {
       // Create a default section
       this.ruleManager.setSectionEnabled('Default', true);
       await this.ruleManager.saveRules();
-      
+
       // Add the rule to the default section
       await this.addNewRuleToSection('Default');
     } else {
@@ -449,27 +451,27 @@ class PopupUI {
    */
   displaySections() {
     const sectionsContainer = this.elements.rulesContainer;
-    
+
     // Remove all existing sections
     const existingSections = sectionsContainer.querySelectorAll('.section');
     existingSections.forEach(section => section.remove());
-    
+
     // Get all sections
     const sections = this.ruleManager.getSections();
-    
+
     // If no sections exist, create a default section
     if (sections.length === 0) {
       this.ruleManager.setSectionEnabled('Default', true);
       this.ruleManager.saveRules();
       sections.push('Default');
     }
-    
+
     // Display sections with their rules
     sections.forEach(sectionName => {
       const sectionElement = this.createSectionElement(sectionName);
       sectionsContainer.appendChild(sectionElement);
     });
-    
+
     // Update all rule statuses
     this.updateAllRuleStatuses();
   }
@@ -503,7 +505,7 @@ class PopupUI {
     if (rule.disabled) {
       ruleElement.setAttribute("data-disabled", "true");
     }
-    
+
     // Add section attribute if rule has a section
     if (rule.section) {
       ruleElement.setAttribute("data-section", rule.section);
@@ -537,17 +539,17 @@ class PopupUI {
       e.stopPropagation();
       this.makeRuleTitleEditable(ruleTitle, rule, index);
     });
-    
+
     // Add CSS to indicate it's editable
     ruleTitle.style.cursor = 'pointer';
     ruleTitle.title = 'Double-click to edit';
-    
+
     // Add click event for edit button
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.makeRuleTitleEditable(ruleTitle, rule, index);
     });
-    
+
     // Set initial values
     fromUrlInput.value = rule.fromUrl || "";
     toUrlInput.value = rule.toUrl || "";
@@ -577,7 +579,7 @@ class PopupUI {
 
     // Update rule status
     this.updateRuleStatus(ruleElement, rule, !rule.disabled);
-    
+
     // Update rule title
     this.updateRuleTitle(ruleElement, rule);
 
@@ -619,7 +621,7 @@ class PopupUI {
 
     const rule = this.ruleManager.rules[index];
     this.updateRuleTitle(ruleElement, rule);
-    
+
     // Update rule status after changing URLs
     const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
     this.updateRuleStatus(ruleElement, rule, this.ruleManager.enabled && sectionEnabled);
@@ -631,16 +633,16 @@ class PopupUI {
   isValidRedirectUrl(url) {
     // URL must not be empty
     if (!url) return false;
-    
+
     // URL must start with http:// or https://
     if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
-    
+
     // If URL contains wildcards, make sure they're valid
     if (url.includes('**')) {
       // Only one wildcard pattern is allowed
       if ((url.match(/\*\*/g) || []).length > 1) return false;
     }
-    
+
     return true;
   }
 
@@ -650,12 +652,12 @@ class PopupUI {
   showValidationError(inputElement, message) {
     // Remove any existing error message
     this.removeValidationError(inputElement);
-    
+
     // Create and add error message
     const errorElement = document.createElement('div');
     errorElement.className = 'rule__error-message';
     errorElement.textContent = message;
-    
+
     // Insert after the input element
     inputElement.parentNode.insertBefore(errorElement, inputElement.nextSibling);
   }
@@ -708,11 +710,11 @@ class PopupUI {
 
     // Check if the rule's section is enabled
     const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
-    
+
     // Check if rule has both fromUrl and toUrl
-    const hasValidUrls = rule.fromUrl && rule.fromUrl.trim() !== "" && 
-                         rule.toUrl && rule.toUrl.trim() !== "";
-    
+    const hasValidUrls = rule.fromUrl && rule.fromUrl.trim() !== "" &&
+      rule.toUrl && rule.toUrl.trim() !== "";
+
     // Rule is only effectively enabled if:
     // 1. Global redirect is enabled (isEnabled)
     // 2. Rule itself is not disabled (!rule.disabled)
@@ -725,7 +727,7 @@ class PopupUI {
       statusIndicator.classList.add("rule__status--inactive");
       toggleBtn.classList.add("rule__toggle-btn--inactive");
       ruleElement.setAttribute("data-disabled", "true");
-      
+
       // Add a title attribute to explain why the rule is inactive
       if (!hasValidUrls) {
         statusIndicator.title = "Rule is missing From URL or To URL";
@@ -787,12 +789,7 @@ class PopupUI {
    * Extract domain from URL
    */
   extractDomain(url) {
-    try {
-      if (!url.includes("://")) url = "https://" + url;
-      return new URL(url).hostname || url;
-    } catch {
-      return url;
-    }
+    return URLUtils.extractDomain(url);
   }
 
   /**
@@ -972,17 +969,17 @@ class PopupUI {
   async processImportedRules(jsonData) {
     try {
       const importedRules = JSON.parse(jsonData);
-      
+
       if (!Array.isArray(importedRules)) {
         this.showImportExportStatus("Invalid file format. Expected an array of rules.", false);
         return;
       }
-      
+
       // Validate rules
-      const validRules = importedRules.filter(rule => 
+      const validRules = importedRules.filter(rule =>
         rule.fromUrl !== undefined && rule.toUrl !== undefined
       );
-      
+
       if (validRules.length === 0) {
         this.showImportExportStatus("No valid rules found in the file.", false);
         return;
@@ -991,15 +988,15 @@ class PopupUI {
       // Add imported rules to existing rules
       validRules.forEach(rule => {
         const newRule = new RedirectRule(rule);
-        
+
         // Ensure all rules have a section
         if (!newRule.section) {
           newRule.section = 'Default';
         }
-        
+
         this.ruleManager.rules.push(newRule);
       });
-      
+
       // Initialize sections from imported rules
       this.ruleManager.rules.forEach(rule => {
         if (rule.section && !this.ruleManager.sections.hasOwnProperty(rule.section)) {
@@ -1056,31 +1053,31 @@ class PopupUI {
    */
   displaySections() {
     const sectionsContainer = this.elements.rulesContainer;
-    
+
     // Remove all existing sections
     const existingSections = sectionsContainer.querySelectorAll('.section');
     existingSections.forEach(section => section.remove());
-    
+
     // Get all sections
     const sections = this.ruleManager.getSections();
-    
+
     // If no sections exist, create a default section
     if (sections.length === 0) {
       this.ruleManager.setSectionEnabled('Default', true);
       this.ruleManager.saveRules();
       sections.push('Default');
     }
-    
+
     // Display sections with their rules
     sections.forEach(sectionName => {
       const sectionElement = this.createSectionElement(sectionName);
       sectionsContainer.appendChild(sectionElement);
     });
-    
+
     // Update all rule statuses
     this.updateAllRuleStatuses();
   }
-  
+
   /**
    * Create a section element
    */
@@ -1088,43 +1085,43 @@ class PopupUI {
     const sectionElement = document.createElement('div');
     sectionElement.className = 'section';
     sectionElement.setAttribute('data-section', sectionName);
-    
+
     const isEnabled = this.ruleManager.isSectionEnabled(sectionName);
     if (!isEnabled) {
       sectionElement.setAttribute('data-disabled', 'true');
     }
-    
+
     const header = document.createElement('div');
     header.className = 'section__header';
-    
+
     const titleContainer = document.createElement('div');
     titleContainer.className = 'section__title-container';
-    
+
     // Add collapse icon
     const collapseIcon = document.createElement('span');
     collapseIcon.className = 'section__collapse-icon';
     collapseIcon.innerHTML = '<i class="fas fa-chevron-down"></i>';
-    
+
     const statusIndicator = document.createElement('span');
     statusIndicator.className = `section__status ${isEnabled ? 'section__status--active' : 'section__status--inactive'}`;
-    
+
     const title = document.createElement('h3');
     title.className = 'section__title';
     title.textContent = sectionName;
-    
+
     // Add double-click event to make title editable
     title.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       this.makeElementEditable(title, sectionName);
     });
-    
+
     // Add CSS to indicate it's editable
     title.style.cursor = 'pointer';
     title.title = 'Double-click to edit';
-    
+
     const actions = document.createElement('div');
     actions.className = 'section__actions';
-    
+
     // Create Add Rule button
     const addRuleBtn = document.createElement('button');
     addRuleBtn.className = 'btn section__add-rule-btn';
@@ -1134,53 +1131,53 @@ class PopupUI {
       e.stopPropagation();
       this.addNewRuleToSection(sectionName);
     });
-    
+
     const toggleBtn = document.createElement('button');
     toggleBtn.className = `btn section__toggle-btn ${!isEnabled ? 'section__toggle-btn--inactive' : ''}`;
     toggleBtn.title = 'Toggle Section Active State';
     toggleBtn.innerHTML = '<i class="fas fa-power-off"></i>';
-    
+
     const editBtn = document.createElement('button');
     editBtn.className = 'btn section__edit-btn';
     editBtn.title = 'Edit Section Name';
     editBtn.innerHTML = '<i class="fas fa-edit"></i>';
-    
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn section__delete-btn';
     deleteBtn.title = 'Delete Section';
     deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    
+
     // Add event listener for toggle button
     toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleSectionActive(sectionName);
     });
-    
+
     // Add event listener for edit button
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.editSectionName(sectionName);
     });
-    
+
     // Add event listener for delete button
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.deleteSection(sectionName);
     });
-    
+
     // Assemble the section element
     titleContainer.appendChild(collapseIcon);
     titleContainer.appendChild(statusIndicator);
     titleContainer.appendChild(title);
-    
+
     actions.appendChild(addRuleBtn);
     actions.appendChild(toggleBtn);
     actions.appendChild(editBtn);
     actions.appendChild(deleteBtn);
-    
+
     header.appendChild(titleContainer);
     header.appendChild(actions);
-    
+
     // Add click event to header for collapsing/expanding
     header.addEventListener('click', () => {
       sectionElement.classList.toggle('section--collapsed');
@@ -1190,65 +1187,65 @@ class PopupUI {
       } else {
         icon.className = 'fas fa-chevron-down';
       }
-      
+
       // Save collapse state to localStorage
       const isCollapsed = sectionElement.classList.contains('section--collapsed');
       localStorage.setItem(`section_${sectionName}_collapsed`, isCollapsed);
     });
-    
+
     // Check if section was previously collapsed
     const wasCollapsed = localStorage.getItem(`section_${sectionName}_collapsed`) === 'true';
     if (wasCollapsed) {
       sectionElement.classList.add('section--collapsed');
       collapseIcon.querySelector('i').className = 'fas fa-chevron-right';
     }
-    
+
     sectionElement.appendChild(header);
-    
+
     // Create a container for rules in this section
     const rulesContainer = document.createElement('div');
     rulesContainer.className = 'section__rules';
     sectionElement.appendChild(rulesContainer);
-    
+
     // Display rules for this section
     this.displayRulesForSection(sectionName, rulesContainer);
-    
+
     return sectionElement;
   }
-  
+
   /**
    * Toggle a section's active state
    */
   async toggleSectionActive(sectionName) {
     const isEnabled = this.ruleManager.isSectionEnabled(sectionName);
     this.ruleManager.setSectionEnabled(sectionName, !isEnabled);
-    
+
     // Update UI
     const sectionElement = document.querySelector(`.section[data-section="${sectionName}"]`);
     if (sectionElement) {
       this.updateSectionStatus(sectionElement, !isEnabled);
     }
-    
+
     // Update rule statuses
     this.updateAllRuleStatuses();
-    
+
     // Save changes
     await this.ruleManager.saveRules();
   }
-  
+
   /**
    * Update a section's status indicator
    */
   updateSectionStatus(sectionElement, isEnabled) {
     const statusIndicator = sectionElement.querySelector('.section__status');
     const toggleBtn = sectionElement.querySelector('.section__toggle-btn');
-    
+
     if (!isEnabled) {
       statusIndicator.classList.remove('section__status--active');
       statusIndicator.classList.add('section__status--inactive');
       toggleBtn.classList.add('section__toggle-btn--inactive');
       sectionElement.setAttribute('data-disabled', 'true');
-      } else {
+    } else {
       statusIndicator.classList.add('section__status--active');
       statusIndicator.classList.remove('section__status--inactive');
       toggleBtn.classList.remove('section__toggle-btn--inactive');
@@ -1263,28 +1260,28 @@ class PopupUI {
     // Create a default section name
     let sectionName = "New Section";
     let counter = 1;
-    
+
     // Check if section already exists and generate a unique name
     const existingSections = this.ruleManager.getSections();
     while (existingSections.includes(sectionName)) {
       sectionName = `New Section ${counter}`;
       counter++;
     }
-    
+
     // Create the section
     this.ruleManager.setSectionEnabled(sectionName, true);
-    
+
     // Add a default rule to the section
     const newRuleIndex = this.ruleManager.addRule();
     this.ruleManager.rules[newRuleIndex].section = sectionName;
     this.ruleManager.rules[newRuleIndex].name = "New Rule";
-    
+
     // Save changes
     await this.ruleManager.saveRules();
-    
+
     // Update the UI
     this.displaySections();
-    
+
     // Find the newly created section element and make the title editable
     setTimeout(() => {
       const sectionElements = document.querySelectorAll('.section');
@@ -1304,36 +1301,36 @@ class PopupUI {
   async deleteSection(sectionName) {
     // Get all sections
     const sections = this.ruleManager.getSections();
-    
+
     // If this is the only section, don't allow deletion
     if (sections.length === 1) {
       alert("Cannot delete the only section. At least one section must exist.");
       return;
     }
-    
+
     // Get rules in this section
     const rulesInSection = this.ruleManager.rules.filter(rule => rule.section === sectionName);
-    
+
     // Confirm deletion with a single modal that includes rule count
     let confirmMessage = `Are you sure you want to delete the section "${sectionName}"`;
     if (rulesInSection.length > 0) {
       confirmMessage += ` and ${rulesInSection.length} rule(s) in it`;
     }
     confirmMessage += "?";
-    
+
     if (!confirm(confirmMessage)) {
       return;
     }
-    
+
     // Remove all rules in this section
     this.ruleManager.rules = this.ruleManager.rules.filter(rule => rule.section !== sectionName);
-    
+
     // Remove section from sections object
     delete this.ruleManager.sections[sectionName];
-    
+
     // Save changes
     await this.ruleManager.saveRules();
-    
+
     // Update UI - displaySections will also handle displaying rules without sections
     this.displaySections();
   }
@@ -1344,13 +1341,13 @@ class PopupUI {
   async moveRuleToSection(ruleIndex, sectionName) {
     const rule = this.ruleManager.rules[ruleIndex];
     if (!rule) return;
-    
+
     // Update the rule's section
     rule.section = sectionName;
-    
+
     // Save changes
     await this.ruleManager.saveRules();
-    
+
     // Update UI - displaySections will also handle displaying rules without sections
     this.displaySections();
   }
@@ -1360,10 +1357,10 @@ class PopupUI {
    */
   displayRulesForSection(sectionName, container) {
     // Get rules for this section
-    const rulesForSection = this.ruleManager.rules.filter((rule, index) => 
+    const rulesForSection = this.ruleManager.rules.filter((rule, index) =>
       rule.section === sectionName
     );
-    
+
     // Display each rule
     rulesForSection.forEach((rule, i) => {
       // Find the actual index in the full rules array
@@ -1379,16 +1376,16 @@ class PopupUI {
   async addNewRuleToSection(sectionName) {
     // Create a new rule with default valid URLs
     const newRuleIndex = this.ruleManager.addRule();
-    
+
     // Set the section for this rule and default valid URLs
     const rule = this.ruleManager.rules[newRuleIndex];
     rule.section = sectionName;
     rule.fromUrl = 'https://example.com/**';
     rule.toUrl = 'http://localhost:3000/**';
-    
+
     // Save the rules
     await this.ruleManager.saveRules();
-    
+
     // Refresh the sections display
     this.displaySections();
   }
@@ -1416,19 +1413,19 @@ class PopupUI {
   makeElementEditable(element, sectionName) {
     // Store the original text
     const originalText = element.textContent;
-    
+
     // Make the element editable
     element.contentEditable = true;
     element.focus();
-    
+
     // Select all text
     document.execCommand('selectAll', false, null);
-    
+
     // Add event listeners for saving changes
     const saveChanges = async () => {
       element.contentEditable = false;
       const newName = element.textContent.trim();
-      
+
       // If empty, revert to original
       if (!newName) {
         element.textContent = originalText;
@@ -1439,7 +1436,7 @@ class PopupUI {
       if (newName === sectionName) {
         return;
       }
-      
+
       // Check if section already exists
       const existingSections = this.ruleManager.getSections();
       if (existingSections.includes(newName)) {
@@ -1447,31 +1444,31 @@ class PopupUI {
         element.textContent = originalText;
         return;
       }
-      
+
       // Update section name in rules
       this.ruleManager.rules.forEach(rule => {
         if (rule.section === sectionName) {
           rule.section = newName;
         }
       });
-      
+
       // Update section name in sections object
       if (this.ruleManager.sections[sectionName] !== undefined) {
         const sectionState = this.ruleManager.sections[sectionName];
         this.ruleManager.sections[newName] = sectionState;
         delete this.ruleManager.sections[sectionName];
       }
-      
+
       // Save changes
       await this.ruleManager.saveRules();
-      
+
       // Update UI
       this.displaySections();
     };
-    
+
     // Save on blur
     element.addEventListener('blur', saveChanges, { once: true });
-    
+
     // Save on Enter key
     element.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') {
@@ -1492,44 +1489,44 @@ class PopupUI {
     // Store the original text and rule name
     const originalText = ruleTitle.textContent;
     const originalName = rule.name || "";
-    
+
     // Make the rule title editable
     ruleTitle.contentEditable = true;
     ruleTitle.focus();
-    
+
     // Select all text
     document.execCommand('selectAll', false, null);
-    
+
     // Add event listeners for saving changes
     const saveChanges = async () => {
       ruleTitle.contentEditable = false;
       const newName = ruleTitle.textContent.trim();
-      
+
       // If empty, revert to original display
       if (!newName) {
         rule.name = "";
         this.updateRuleTitle(ruleTitle.closest('.rule'), rule);
         return;
       }
-      
+
       // If unchanged, do nothing
       if (newName === originalName) {
         return;
       }
-      
+
       // Update rule name
       rule.name = newName;
-      
+
       // Save changes
       await this.ruleManager.saveRules();
-      
+
       // Update UI
       this.updateRuleTitle(ruleTitle.closest('.rule'), rule);
     };
-    
+
     // Save on blur
     ruleTitle.addEventListener('blur', saveChanges, { once: true });
-    
+
     // Save on Enter key
     ruleTitle.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') {
@@ -1545,37 +1542,25 @@ class PopupUI {
 
   /**
    * Toggle donate view visibility
+   * @param {boolean} isVisible - Whether to show the donate view
    */
   toggleDonateView(isVisible) {
-    console.log("toggleDonateView called with isVisible:", isVisible);
-    console.log("addSectionBtn before:", this.elements.addSectionBtn.classList.contains("hidden") ? "hidden" : "visible");
+    const { donateContainer, rulesContainer, addSectionBtn } = this.elements;
     
+    // Toggle visibility of elements
+    donateContainer.classList.toggle("hidden", !isVisible);
+    rulesContainer.classList.toggle("hidden", isVisible);
+    addSectionBtn.classList.toggle("hidden", isVisible);
+    
+    // Add click handler for the donate container to go back
     if (isVisible) {
-      // Show donate view, hide rules
-      this.elements.donateContainer.classList.remove("hidden");
-      this.elements.rulesContainer.classList.add("hidden");
-      this.elements.addSectionBtn.classList.add("hidden");
-    } else {
-      // Hide donate view, show rules
-      this.elements.donateContainer.classList.add("hidden");
-      this.elements.rulesContainer.classList.remove("hidden");
-      this.elements.addSectionBtn.classList.remove("hidden");
-    }
-    
-    console.log("addSectionBtn after:", this.elements.addSectionBtn.classList.contains("hidden") ? "hidden" : "visible");
-    
-    // Add click handler for the entire donate container to go back
-    if (isVisible) {
-      const donateContainer = this.elements.donateContainer;
-      
       // Use event delegation to handle clicks on the container
       const handleContainerClick = (event) => {
-        // Don't trigger when clicking on the image or the title
-        if (event.target.closest('.donate-image') || 
-            event.target.closest('.donate-title') ||
-            event.target.closest('.back-btn')) {
-          return;
-        }
+        // Don't trigger when clicking on specific elements
+        const isExcludedElement = ['donate-image', 'donate-title', 'back-btn']
+          .some(className => event.target.closest(`.${className}`));
+          
+        if (isExcludedElement) return;
         
         // Toggle back to rules view
         this.toggleDonateView(false);
