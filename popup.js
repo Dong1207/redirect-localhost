@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.debugToPageToggle.addEventListener("change", () => {
       const enabled = elements.debugToPageToggle.checked;
       chrome.runtime.sendMessage(
-        {action: "toggleDebugToPage", enabled},
+        { action: "toggleDebugToPage", enabled },
         (response) => {
           if (
             response?.debugEnabled !== undefined &&
@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       );
-      chrome.storage.local.set({debugToPage: enabled});
+      chrome.storage.local.set({ debugToPage: enabled });
     });
   }
 
@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Saving rules to storage:", redirectRules);
 
     // Save to Chrome storage
-    chrome.storage.local.set({redirectRules}, () => {
+    chrome.storage.local.set({ redirectRules }, () => {
       // Check for any error
       if (chrome.runtime.lastError) {
         console.error("Error saving rules:", chrome.runtime.lastError);
@@ -112,22 +112,28 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Rules saved successfully");
 
         // Notify the background script about the rule update
-        chrome.runtime.sendMessage({action: "rulesUpdated"}, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "Error notifying background script:",
-              chrome.runtime.lastError
-            );
-          } else if (response?.success) {
-            console.log("Background script updated successfully");
-          }
-        });
+        // Add error handling for the message passing
+        try {
+          chrome.runtime.sendMessage({ action: "rulesUpdated" }, (response) => {
+            // Check if there was a response
+            if (chrome.runtime.lastError) {
+              console.log("Background notification status: " +
+                (chrome.runtime.lastError.message || "Unknown error"));
+            } else if (response?.success) {
+              console.log("Background script updated successfully");
+            } else {
+              console.log("Background script notification sent, no confirmation received");
+            }
+          });
+        } catch (err) {
+          console.error("Failed to notify background script:", err);
+        }
       }
     });
   }
 
   function toggleRedirect() {
-    chrome.storage.local.set({enabled: elements.enableToggle.checked});
+    chrome.storage.local.set({ enabled: elements.enableToggle.checked });
     updateAllRuleStatuses();
   }
 
@@ -160,7 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
       elements.redirectCountElem.textContent = result.redirectCount || 0;
     });
 
-    chrome.runtime.sendMessage({action: "getRedirectCount"}, (response) => {
+    chrome.runtime.sendMessage({ action: "getRedirectCount" }, (response) => {
       if (response?.count !== undefined) {
         elements.redirectCountElem.textContent = response.count;
       }
@@ -193,6 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const newRule = {
       fromUrl: "",
       toUrl: "",
+      name: "",
       resourceTypes: [
         "main_frame",
         "stylesheet",
@@ -206,15 +213,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Add the new rule to the array
     redirectRules.push(newRule);
-    
+
     // Save to storage immediately
     saveRules();
-    
+
     // Create and add the rule element to the DOM
     const index = redirectRules.length - 1;
     const ruleElement = initializeRuleElement(newRule, index);
     elements.rulesContainer.appendChild(ruleElement);
-    
+
     // Expand the newly added rule to allow immediate editing
     setTimeout(() => {
       ruleElement.classList.remove("rule--collapsed");
@@ -222,7 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (icon) {
         icon.className = "fas fa-chevron-down";
       }
-      
+
       // Focus on the From URL input field
       const fromUrlInput = ruleElement.querySelector(".from-url-input");
       if (fromUrlInput) {
@@ -239,6 +246,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const fromUrl = ruleElement.querySelector(".from-url-input").value.trim();
     const toUrl = ruleElement.querySelector(".to-url-input").value.trim();
 
+    // Get the rule name from the input field
+    const ruleNameInput = ruleElement.querySelector(".rule-name-input");
+    const ruleName = ruleNameInput ? ruleNameInput.value.trim() : "";
+
     // Get the disabled state from the rule object, not from the DOM
     const isDisabled = redirectRules[index]?.disabled === true;
 
@@ -251,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
     redirectRules[index] = {
       fromUrl,
       toUrl,
+      name: ruleName,
       resourceTypes,
       disabled: isDisabled,
     };
@@ -286,25 +298,25 @@ document.addEventListener("DOMContentLoaded", () => {
     // Simple pattern matching for immediate feedback
     const fromPattern = rule.fromUrl;
     const toPattern = rule.toUrl;
-    
+
     // Check for wildcard pattern
     if (fromPattern.includes("**")) {
       const parts = fromPattern.split("**");
       const prefix = parts[0];
       const suffix = parts[1] || "";
-      
+
       if (inputUrl.startsWith(prefix) && inputUrl.endsWith(suffix)) {
         // Extract the wildcard content
         const wildcardStart = prefix.length;
         const wildcardEnd = inputUrl.length - suffix.length;
         const wildcardContent = inputUrl.substring(wildcardStart, wildcardEnd);
-        
+
         // Replace the wildcard in the target pattern
         let redirectUrl = toPattern;
         if (toPattern.includes("**")) {
           redirectUrl = toPattern.replace("**", wildcardContent);
         }
-        
+
         return {
           matches: true,
           redirectUrl: redirectUrl,
@@ -318,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
         redirectUrl: toPattern
       };
     }
-    
+
     return { matches: false };
   }
 
@@ -362,18 +374,18 @@ document.addEventListener("DOMContentLoaded", () => {
   function createRuleElement(rule = {}, index) {
     const clone = document.importNode(elements.ruleTemplate.content, true);
     const ruleElement = clone.querySelector(".rule");
-    
+
     ruleElement.setAttribute("data-index", index);
     if (rule.disabled) {
       ruleElement.setAttribute("data-disabled", "true");
     }
-    
+
     return ruleElement;
   }
 
   function initializeRuleElement(rule, index) {
     const ruleElement = createRuleElement(rule, index);
-    
+
     // Get form elements
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
@@ -382,24 +394,137 @@ document.addEventListener("DOMContentLoaded", () => {
     const toggleActiveBtn = ruleElement.querySelector(".rule__toggle-btn");
     const deleteBtn = ruleElement.querySelector(".rule__delete-btn");
     const header = ruleElement.querySelector(".rule__header");
-    
+
     // Ensure the rule is collapsed by default
     ruleElement.classList.add("rule--collapsed");
     const collapseIcon = ruleElement.querySelector(".rule__collapse-icon i");
     collapseIcon.className = "fas fa-chevron-right";
-    
+
     // Set initial values - ensure we're using the correct property names
     fromUrlInput.value = rule.fromUrl || "";
     toUrlInput.value = rule.toUrl || "";
-    
-    // Set up resource type checkboxes
-    if (rule.resourceTypes && rule.resourceTypes.length > 0) {
-      const checkboxes = ruleElement.querySelectorAll(".advanced__resource-types input");
-      checkboxes.forEach((checkbox) => {
-        checkbox.checked = rule.resourceTypes.includes(checkbox.value);
-      });
+
+    // Create a better structured advanced options section
+    if (advancedBtn) {
+      advancedBtn.className = "btn btn--secondary advanced-options__toggle";
+      advancedBtn.innerHTML = '<i class="fas fa-cog"></i> Advanced';
+
+      // Improve the advanced sections container
+      if (advancedSections) {
+        advancedSections.className = "advanced-options__sections";
+
+        // Clear existing content to rebuild it
+        advancedSections.innerHTML = '';
+
+        // 1. Add Rule Name field
+        const ruleNameSection = document.createElement("div");
+        ruleNameSection.className = "advanced-section";
+        ruleNameSection.innerHTML = `
+          <label class="advanced-section__label">
+            Rule Name
+            <input type="text" class="advanced-section__input rule-name-input" 
+                   placeholder="Enter a custom name for this rule" value="${rule.name || ''}">
+          </label>
+          <div class="advanced-section__help">A custom name to help identify this rule</div>
+        `;
+        advancedSections.appendChild(ruleNameSection);
+
+        // 2. Add Resource Types section with improved layout
+        const resourceTypesSection = document.createElement("div");
+        resourceTypesSection.className = "advanced-section resource-types";
+
+        // Create the resource types header
+        const resourceTypesHeader = document.createElement("div");
+        resourceTypesHeader.className = "advanced-section__header";
+        resourceTypesHeader.textContent = "Resource Types";
+        resourceTypesSection.appendChild(resourceTypesHeader);
+
+        // Create the resource types grid
+        const resourceTypesGrid = document.createElement("div");
+        resourceTypesGrid.className = "resource-types__grid";
+
+        // Define all possible resource types
+        const allResourceTypes = [
+          { value: "main_frame", label: "Pages" },
+          { value: "stylesheet", label: "CSS" },
+          { value: "script", label: "JS" },
+          { value: "image", label: "Images" },
+          { value: "xmlhttprequest", label: "XHR" },
+          { value: "other", label: "Other" }
+        ];
+
+        // Add checkboxes for each resource type
+        allResourceTypes.forEach(type => {
+          const isChecked = rule.resourceTypes && rule.resourceTypes.includes(type.value);
+
+          const checkbox = document.createElement("label");
+          checkbox.className = "resource-types__option";
+          checkbox.innerHTML = `
+            <input type="checkbox" value="${type.value}" ${isChecked ? 'checked' : ''}>
+            <span>${type.label}</span>
+          `;
+          resourceTypesGrid.appendChild(checkbox);
+        });
+
+        resourceTypesSection.appendChild(resourceTypesGrid);
+        advancedSections.appendChild(resourceTypesSection);
+
+        // 3. Add Test URL section with improved layout
+        const testSection = document.createElement("div");
+        testSection.className = "advanced-section test-section";
+
+        const testHeader = document.createElement("div");
+        testHeader.className = "advanced-section__header";
+        testHeader.textContent = "Test Redirect";
+        testSection.appendChild(testHeader);
+
+        const testContent = document.createElement("div");
+        testContent.className = "test-section__content";
+
+        const testInputGroup = document.createElement("div");
+        testInputGroup.className = "test-section__input-group";
+
+        const testInput = document.createElement("input");
+        testInput.type = "text";
+        testInput.className = "test-section__input";
+        testInput.placeholder = "Enter full URL to test including https://";
+
+        const testBtn = document.createElement("button");
+        testBtn.className = "test-section__btn";
+        testBtn.textContent = "Test";
+
+        testInputGroup.appendChild(testInput);
+        testInputGroup.appendChild(testBtn);
+
+        const testResult = document.createElement("div");
+        testResult.className = "test-section__result";
+        testResult.style.display = "none";
+
+        testContent.appendChild(testInputGroup);
+        testContent.appendChild(testResult);
+        testSection.appendChild(testContent);
+
+        advancedSections.appendChild(testSection);
+
+        // Set up the test functionality
+        setupTestFunctionality(ruleElement, rule, testInput, testBtn, testResult);
+
+        // Add event listeners for resource type checkboxes
+        resourceTypesGrid.querySelectorAll("input[type='checkbox']").forEach(checkbox => {
+          checkbox.addEventListener("change", () => updateRule(index));
+        });
+
+        // Add event listener for rule name input
+        const ruleNameInput = ruleNameSection.querySelector(".rule-name-input");
+        if (ruleNameInput) {
+          ruleNameInput.addEventListener("input", () => {
+            updateRule(index);
+            updateRuleTitle(ruleElement, redirectRules[index]);
+          });
+        }
+      }
     }
-    
+
     // Set up event listeners for the header (collapse/expand)
     const titleContainer = header.querySelector(".rule__title-container");
     titleContainer.addEventListener("click", () => {
@@ -409,116 +534,56 @@ document.addEventListener("DOMContentLoaded", () => {
         ? "fas fa-chevron-right"
         : "fas fa-chevron-down";
     });
-    
+
     // Set up event listeners for action buttons with stopPropagation
     deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation(); // Prevent event from bubbling up to header
       deleteRule(index);
     });
-    
+
     toggleActiveBtn.addEventListener("click", (e) => {
       e.stopPropagation(); // Prevent event from bubbling up to header
       redirectRules[index].disabled = !redirectRules[index].disabled;
       updateRuleStatus(ruleElement, redirectRules[index], elements.enableToggle.checked);
       saveRules();
     });
-    
+
     advancedBtn.addEventListener("click", (e) => {
       e.stopPropagation(); // Prevent event from bubbling up
-      advancedSections.style.display = 
-        advancedSections.style.display === "none" || !advancedSections.style.display 
-          ? "block" 
+      advancedSections.style.display =
+        advancedSections.style.display === "none" || !advancedSections.style.display
+          ? "block"
           : "none";
     });
-    
-    // Set up test functionality
-    setupTestFunctionality(ruleElement, rule);
-    
-    // Attach input event listeners
-    attachRuleEventListeners(ruleElement, rule, index, {
-      fromUrlInput,
-      toUrlInput,
-      advancedBtn,
-      advancedSections,
-      toggleActiveBtn
-    });
-    
+
     // Update rule title and status
     updateRuleTitle(ruleElement, rule);
     updateRuleStatus(ruleElement, rule, elements.enableToggle.checked);
-    
+
     return ruleElement;
   }
 
-  function attachRuleEventListeners(
-    element,
-    rule,
-    index,
-    {fromUrlInput, toUrlInput, advancedBtn, advancedSections, toggleActiveBtn}
-  ) {
-    // Input change handlers
-    const updateHandler = () => {
-      updateRule(index);
-      updateRuleTitle(element, redirectRules[index]);
-      chrome.storage.local.get(["enabled"], (result) => {
-        updateRuleStatus(
-          element,
-          redirectRules[index],
-          result.enabled === true
-        );
-      });
-    };
-
-    // Add both input and change event listeners to catch all changes
-    fromUrlInput.addEventListener("input", updateHandler);
-    fromUrlInput.addEventListener("change", updateHandler);
-    fromUrlInput.addEventListener("blur", updateHandler);
-    
-    toUrlInput.addEventListener("input", updateHandler);
-    toUrlInput.addEventListener("change", updateHandler);
-    toUrlInput.addEventListener("blur", updateHandler);
-
-    element
-      .querySelectorAll(".advanced__resource-types input")
-      .forEach((checkbox) => {
-        checkbox.addEventListener("change", () => updateRule(index));
-      });
-
-    // Note: The toggle active button, delete button, and collapse functionality
-    // event listeners are now set up in the initializeRuleElement function
-  }
-
-  function updateRuleTitle(ruleElement, rule) {
-    const ruleTitle = ruleElement.querySelector(".rule__title");
-    if (rule.fromUrl && rule.toUrl) {
-      const fromDomain = extractDomain(rule.fromUrl);
-      const toDomain = extractDomain(rule.toUrl);
-      ruleTitle.textContent = `${fromDomain} => ${toDomain}`;
-    } else {
-      ruleTitle.textContent = "New Rule";
+  function setupTestFunctionality(ruleElement, rule, testInput, testBtn, testResult) {
+    if (!testInput || !testBtn || !testResult) {
+      console.warn("Test functionality elements not provided", rule);
+      return;
     }
-  }
-
-  function setupTestFunctionality(element, rule) {
-    const testInput = element.querySelector(".advanced__test-input");
-    const testBtn = element.querySelector(".advanced__test-btn");
-    const testResult = element.querySelector(".advanced__test-result");
 
     testBtn.addEventListener("click", (e) => {
-      e.stopPropagation(); // Prevent event from bubbling up
-      
+      e.stopPropagation();
+
       const inputUrl = testInput.value.trim();
       if (!inputUrl) {
         testResult.textContent = "Please enter a URL to test";
         testResult.style.display = "block";
-        testResult.className = "advanced__test-result test-result error";
+        testResult.className = "test-section__result error";
         return;
       }
 
       // Get the current rule data from the form
-      const ruleIndex = element.getAttribute("data-index");
+      const ruleIndex = ruleElement.getAttribute("data-index");
       const currentRule = redirectRules[ruleIndex];
-      
+
       // Test with the current rule data
       chrome.runtime.sendMessage(
         {
@@ -529,20 +594,35 @@ document.addEventListener("DOMContentLoaded", () => {
         (response) => {
           if (response && response.matched) {
             testResult.innerHTML = `✅ Match! Will redirect to:<br>${response.redirectUrl}`;
-            testResult.className = "advanced__test-result test-result success";
+            testResult.className = "test-section__result success";
           } else {
             testResult.textContent = "❌ No match. This URL won't be redirected.";
-            testResult.className = "advanced__test-result test-result error";
+            testResult.className = "test-section__result error";
           }
           testResult.style.display = "block";
         }
       );
     });
-    
+
     // Prevent input field clicks from collapsing the rule
     testInput.addEventListener("click", (e) => {
       e.stopPropagation();
     });
+  }
+
+  function updateRuleTitle(ruleElement, rule) {
+    const ruleTitle = ruleElement.querySelector(".rule__title");
+
+    // Use custom name if available
+    if (rule.name && rule.name.trim() !== "") {
+      ruleTitle.textContent = rule.name;
+    } else if (rule.fromUrl && rule.toUrl) {
+      const fromDomain = extractDomain(rule.fromUrl);
+      const toDomain = extractDomain(rule.toUrl);
+      ruleTitle.textContent = `${fromDomain} => ${toDomain}`;
+    } else {
+      ruleTitle.textContent = "New Rule";
+    }
   }
 
   // Debug panel functions
@@ -607,7 +687,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function clearRedirectHistory() {
-    chrome.runtime.sendMessage({action: "clearRedirectHistory"}, () => {
+    chrome.runtime.sendMessage({ action: "clearRedirectHistory" }, () => {
       loadRedirectHistory();
     });
   }
@@ -615,7 +695,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Rule import/export functions
   function exportRules() {
     const rulesJson = JSON.stringify(redirectRules, null, 2);
-    const blob = new Blob([rulesJson], {type: "application/json"});
+    const blob = new Blob([rulesJson], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
@@ -716,9 +796,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showImportExportStatus(message, isSuccess) {
     const statusElement = document.createElement("div");
-    statusElement.className = `import-export__status ${
-      isSuccess ? "success" : "error"
-    }`;
+    statusElement.className = `import-export__status ${isSuccess ? "success" : "error"
+      }`;
     statusElement.textContent = message;
 
     const container = elements.importRulesBtn.closest(".import-export");
@@ -741,7 +820,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // kept as is but would follow the same pattern of optimization if needed
 
   function showDiagnosticDialog() {
-    chrome.runtime.sendMessage({action: "getActiveRules"}, (response) => {
+    chrome.runtime.sendMessage({ action: "getActiveRules" }, (response) => {
       if (response.error) {
         alert(`Error: ${response.error}`);
         return;
@@ -768,61 +847,24 @@ document.addEventListener("DOMContentLoaded", () => {
         report += `Resources: ${rule.condition.resourceTypes.join(", ")}\n\n`;
       });
 
-      // Create a more stylish alert dialog
+      // Create a more stylish alert dialog using BEM classes
       const dialogContainer = document.createElement("div");
-      dialogContainer.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      `;
+      dialogContainer.className = "dialog-overlay";
 
       const dialog = document.createElement("div");
-      dialog.style.cssText = `
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        max-width: 80%;
-        max-height: 80%;
-        overflow-y: auto;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      `;
+      dialog.className = "dialog";
 
       const heading = document.createElement("h3");
+      heading.className = "dialog__heading";
       heading.textContent = "Active Redirect Rules";
-      heading.style.marginTop = "0";
 
       const content = document.createElement("pre");
+      content.className = "dialog__content";
       content.textContent = report;
-      content.style.cssText = `
-        white-space: pre-wrap;
-        font-family: monospace;
-        font-size: 12px;
-        max-height: 300px;
-        overflow-y: auto;
-        padding: 10px;
-        background: #f5f5f5;
-        border-radius: 4px;
-      `;
 
       const closeBtn = document.createElement("button");
       closeBtn.textContent = "Close";
-      closeBtn.className = "btn";
-      closeBtn.style.cssText = `
-        margin-top: 15px;
-        background: #2196F3;
-        color: white;
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      `;
+      closeBtn.className = "btn dialog__btn";
 
       closeBtn.addEventListener("click", () => {
         document.body.removeChild(dialogContainer);
@@ -838,7 +880,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function checkActiveRules() {
-    chrome.runtime.sendMessage({action: "getActiveRules"}, (response) => {
+    chrome.runtime.sendMessage({ action: "getActiveRules" }, (response) => {
       if (response.error) {
         elements.testUrlResult.innerHTML = `<div class="test-result error">${response.error}</div>`;
         elements.testUrlResult.style.display = "block";
@@ -861,10 +903,10 @@ document.addEventListener("DOMContentLoaded", () => {
             rule.action.redirect.url ||
             "Unknown destination";
 
-          html += `<div style="margin-top:8px; padding:5px; background:#f1f1f1; border-radius:3px;">
-            <strong>Rule ${rule.id}</strong><br>
-            Pattern: ${pattern}<br>
-            Redirect: ${redirect}
+          html += `<div class="rule-info">
+            <strong class="rule-info__id">Rule ${rule.id}</strong>
+            <div class="rule-info__detail">Pattern: ${pattern}</div>
+            <div class="rule-info__detail">Redirect: ${redirect}</div>
           </div>`;
         });
       }
@@ -880,7 +922,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function testCurrentPageUrl() {
     // Get current active tab URL
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.url) {
         elements.testUrlInput.value = tabs[0].url;
         testUrl();
@@ -923,14 +965,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (matchFound) {
       let resultHTML = `<div class="test-url__result-header success">✅ URL will be redirected</div>`;
 
-      matchingRules.forEach(({rule, redirectUrl, index}) => {
+      matchingRules.forEach(({ rule, redirectUrl, index }) => {
         resultHTML += `
           <div class="test-url__result-item">
-            <div class="test-url__result-rule">Rule #${
-              index + 1
-            }: ${extractDomain(rule.fromUrl)} → ${extractDomain(
-          rule.toUrl
-        )}</div>
+            <div class="test-url__result-rule">Rule #${index + 1
+          }: ${extractDomain(rule.fromUrl)} → ${extractDomain(
+            rule.toUrl
+          )}</div>
             <div class="test-url__result-redirect">Redirects to: ${redirectUrl}</div>
           </div>
         `;
