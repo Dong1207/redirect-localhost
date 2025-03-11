@@ -54,14 +54,31 @@ function debugLog(...args) {
 
   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
     if (!tabs[0]) return;
-
-    chrome.scripting
-      .executeScript({
-        target: {tabId: tabs[0].id},
-        func: (args) => console.log("[REDIRECT-EXTENSION]", ...args),
-        args: [args],
-      })
-      .catch((err) => console.error("Failed to log to page console:", err));
+    
+    try {
+      // Check if the tab URL is http/https
+      const tabUrl = new URL(tabs[0].url);
+      if (tabUrl.protocol !== 'http:' && tabUrl.protocol !== 'https:') {
+        return; // Skip non-http/https pages
+      }
+      
+      // Try to send message to the content script
+      chrome.tabs.sendMessage(tabs[0].id, {
+        source: "redirect-extension-debug",
+        args: args
+      }).catch(error => {
+        // If message fails (content script not injected), try to inject and execute directly
+        chrome.scripting
+          .executeScript({
+            target: {tabId: tabs[0].id},
+            func: (args) => console.log("[REDIRECT-EXTENSION]", ...args),
+            args: [args],
+          })
+          .catch((err) => console.error("Failed to log to page console:", err));
+      });
+    } catch (error) {
+      console.error("Error in debugLog:", error);
+    }
   });
 }
 
@@ -410,14 +427,9 @@ async function handleDebugToggle(enabled) {
       return {success: false, debugEnabled: false, error: "Permission denied"};
     }
   } else if (!debugToPage && wasEnabled) {
-    // Disable debug mode and remove scripts
-    try {
-      await chrome.scripting.unregisterContentScripts({
-        ids: ["redirect-debug"],
-      });
-    } catch (error) {
-      console.log("Error removing debug script:", error);
-    }
+    // When disabling debug, we don't need to do anything special
+    // The script will remain injected but won't receive any messages
+    // It will be removed when the page is refreshed
   }
 
   return {success: true, debugEnabled: debugToPage};
@@ -438,21 +450,37 @@ async function injectDebugScript() {
       });
     }
 
-    // Now we can safely register the script
-    await chrome.scripting.registerContentScripts([
-      {
-        id: "redirect-debug",
-        js: ["debug-inject.js"],
-        matches: ["<all_urls>"],
-        runAt: "document_start",
-      },
-    ]);
+    // Get the active tab
+    const tabs = await chrome.tabs.query({active: true, currentWindow: true});
+    if (!tabs || !tabs[0]) {
+      console.log("No active tab found for debug script injection");
+      return;
+    }
 
-    console.log("Debug script successfully registered");
+    const activeTab = tabs[0];
+    
+    // Extract the origin from the active tab URL
+    let tabUrl;
+    try {
+      tabUrl = new URL(activeTab.url);
+      
+      // Only inject on http/https pages
+      if (tabUrl.protocol !== 'http:' && tabUrl.protocol !== 'https:') {
+        console.log("Debug script not injected: not an http/https page");
+        return;
+      }
+      
+      // Now we can safely register the script for this specific tab
+      await chrome.scripting.executeScript({
+        target: {tabId: activeTab.id},
+        files: ["debug-inject.js"]
+      });
+      
+      console.log("Debug script injected into active tab:", tabUrl.origin);
+    } catch (error) {
+      console.error("Error injecting debug script:", error);
+    }
   } catch (error) {
-    console.error("Failed to register debug script:", error);
-    // Reset debug mode if script registration fails
-    debugToPage = false;
-    await chrome.storage.local.set({debugToPage: false});
+    console.error("Failed to inject debug script:", error);
   }
 }

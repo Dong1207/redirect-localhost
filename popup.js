@@ -580,6 +580,10 @@ class PopupUI {
 
     const rule = this.ruleManager.rules[index];
     this.updateRuleTitle(ruleElement, rule);
+    
+    // Update rule status after changing URLs
+    const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
+    this.updateRuleStatus(ruleElement, rule, this.ruleManager.enabled && sectionEnabled);
   }
 
   /**
@@ -603,7 +607,8 @@ class PopupUI {
     // Update UI
     const ruleElement = document.querySelector(`.rule[data-index="${index}"]`);
     if (ruleElement) {
-      this.updateRuleStatus(ruleElement, rule, this.ruleManager.enabled);
+      const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
+      this.updateRuleStatus(ruleElement, rule, this.ruleManager.enabled && sectionEnabled);
     }
 
     // Save changes
@@ -619,18 +624,42 @@ class PopupUI {
 
     // Check if the rule's section is enabled
     const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
-    const effectivelyEnabled = isEnabled && !rule.disabled && sectionEnabled;
+    
+    // Check if rule has both fromUrl and toUrl
+    const hasValidUrls = rule.fromUrl && rule.fromUrl.trim() !== "" && 
+                         rule.toUrl && rule.toUrl.trim() !== "";
+    
+    // Rule is only effectively enabled if:
+    // 1. Global redirect is enabled (isEnabled)
+    // 2. Rule itself is not disabled (!rule.disabled)
+    // 3. Rule's section is enabled (sectionEnabled)
+    // 4. Rule has valid fromUrl and toUrl (hasValidUrls)
+    const effectivelyEnabled = isEnabled && !rule.disabled && sectionEnabled && hasValidUrls;
 
     if (!effectivelyEnabled) {
       statusIndicator.classList.remove("rule__status--active");
       statusIndicator.classList.add("rule__status--inactive");
       toggleBtn.classList.add("rule__toggle-btn--inactive");
       ruleElement.setAttribute("data-disabled", "true");
+      
+      // Add a title attribute to explain why the rule is inactive
+      if (!hasValidUrls) {
+        statusIndicator.title = "Rule is missing From URL or To URL";
+      } else if (rule.disabled) {
+        statusIndicator.title = "Rule is disabled";
+      } else if (!sectionEnabled) {
+        statusIndicator.title = "Section is disabled";
+      } else if (!isEnabled) {
+        statusIndicator.title = "Redirect is globally disabled";
+      } else {
+        statusIndicator.title = "Rule is inactive";
+      }
     } else {
       statusIndicator.classList.add("rule__status--active");
       statusIndicator.classList.remove("rule__status--inactive");
       toggleBtn.classList.remove("rule__toggle-btn--inactive");
       ruleElement.removeAttribute("data-disabled");
+      statusIndicator.title = "Rule is active";
     }
   }
 
@@ -858,27 +887,24 @@ class PopupUI {
    */
   async processImportedRules(jsonData) {
     try {
-    const importedRules = JSON.parse(jsonData);
-
-    if (!Array.isArray(importedRules)) {
+      const importedRules = JSON.parse(jsonData);
+      
+      if (!Array.isArray(importedRules)) {
         this.showImportExportStatus("Invalid file format. Expected an array of rules.", false);
-      return;
-    }
-
+        return;
+      }
+      
       // Validate rules
       const validRules = importedRules.filter(rule => 
         rule.fromUrl !== undefined && rule.toUrl !== undefined
-    );
+      );
+      
+      if (validRules.length === 0) {
+        this.showImportExportStatus("No valid rules found in the file.", false);
+        return;
+      }
 
-    if (validRules.length === 0) {
-      this.showImportExportStatus("No valid rules found in the file.", false);
-      return;
-    }
-
-      // Clear existing rules
-      this.ruleManager.rules = [];
-
-      // Add imported rules
+      // Add imported rules to existing rules
       validRules.forEach(rule => {
         const newRule = new RedirectRule(rule);
         
@@ -887,9 +913,9 @@ class PopupUI {
           newRule.section = 'Default';
         }
         
-      this.ruleManager.rules.push(newRule);
-    });
-
+        this.ruleManager.rules.push(newRule);
+      });
+      
       // Initialize sections from imported rules
       this.ruleManager.rules.forEach(rule => {
         if (rule.section && !this.ruleManager.sections.hasOwnProperty(rule.section)) {
@@ -898,16 +924,16 @@ class PopupUI {
       });
 
       // Save to storage
-    await this.ruleManager.saveRules();
+      await this.ruleManager.saveRules();
 
       // Update UI - displaySections will also handle displaying rules without sections
       this.displaySections();
 
       // Show success message
-    this.showImportExportStatus(
+      this.showImportExportStatus(
         `Successfully imported ${validRules.length} rules.`,
-      true
-    );
+        true
+      );
     } catch (error) {
       console.error("Error parsing imported rules:", error);
       this.showImportExportStatus(
@@ -1167,7 +1193,7 @@ class PopupUI {
     // Add a default rule to the section
     const newRuleIndex = this.ruleManager.addRule();
     this.ruleManager.rules[newRuleIndex].section = sectionName;
-    this.ruleManager.rules[newRuleIndex].name = "Default Rule";
+    this.ruleManager.rules[newRuleIndex].name = "New Rule";
     
     // Save changes
     await this.ruleManager.saveRules();
@@ -1192,11 +1218,6 @@ class PopupUI {
    * Delete a section
    */
   async deleteSection(sectionName) {
-    // Confirm deletion
-    if (!confirm(`Are you sure you want to delete the section "${sectionName}"?`)) {
-      return;
-    }
-    
     // Get all sections
     const sections = this.ruleManager.getSections();
     
@@ -1206,15 +1227,22 @@ class PopupUI {
       return;
     }
     
-    // Find another section to move rules to
-    const targetSection = sections.find(section => section !== sectionName) || 'Default';
+    // Get rules in this section
+    const rulesInSection = this.ruleManager.rules.filter(rule => rule.section === sectionName);
     
-    // Move rules to another section
-    this.ruleManager.rules.forEach(rule => {
-      if (rule.section === sectionName) {
-        rule.section = targetSection;
-      }
-    });
+    // Confirm deletion with a single modal that includes rule count
+    let confirmMessage = `Are you sure you want to delete the section "${sectionName}"`;
+    if (rulesInSection.length > 0) {
+      confirmMessage += ` and ${rulesInSection.length} rule(s) in it`;
+    }
+    confirmMessage += "?";
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    // Remove all rules in this section
+    this.ruleManager.rules = this.ruleManager.rules.filter(rule => rule.section !== sectionName);
     
     // Remove section from sections object
     delete this.ruleManager.sections[sectionName];
