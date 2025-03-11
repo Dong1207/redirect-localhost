@@ -152,6 +152,15 @@ function createRuleObject(rule, id) {
   ];
 
   const {fromUrl, toUrl} = rule;
+  
+  // Basic URL validation
+  if (!fromUrl || !toUrl || 
+      !fromUrl.startsWith('http://') && !fromUrl.startsWith('https://') ||
+      !toUrl.startsWith('http://') && !toUrl.startsWith('https://')) {
+    // Return null for invalid URLs, which will be filtered out
+    return null;
+  }
+  
   const wildcardIndex = fromUrl.indexOf("**");
 
   // No wildcard case - simple URL matching

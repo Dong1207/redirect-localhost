@@ -358,40 +358,51 @@ body {
 
 .rule__input {
     width: 100%;
-    padding: 6px;
-    border: 1px solid #ddd;
+    padding: 8px;
+    border: 1px solid #ccc;
     border-radius: 4px;
+    font-size: 14px;
     box-sizing: border-box;
+}
+
+.rule__input--error {
+    border-color: #ff3333;
+    background-color: #fff8f8;
+}
+
+.rule__error-message {
+    color: #ff3333;
     font-size: 12px;
+    margin-top: 4px;
+    margin-bottom: 8px;
 }
 
 .rule__hint {
-    margin: 4px 0 0;
+    font-size: 12px;
     color: #666;
-    font-size: 11px;
-    font-style: italic;
+    margin-top: 4px;
 }
 
 .rule__toggle-btn {
-    background-color: transparent;
-    padding: 4px;
     color: #4CAF50;
-    font-size: 11px;
+    margin-right: 5px;
 }
 
 .rule__toggle-btn--inactive {
-    color: #F44336;
+    color: #ccc;
+}
+
+.rule__edit-btn {
+    color: #2196F3;
+    margin-right: 5px;
+}
+
+.rule__edit-btn:hover {
+    color: #0b7dda;
 }
 
 .rule__delete-btn {
-    background-color: transparent;
     color: #f44336;
-    padding: 4px;
-    font-size: 11px;
-}
-
-.rule__delete-btn:hover {
-    background-color: rgba(244, 67, 54, 0.1);
 }
 
 /* Advanced Options */

@@ -521,6 +521,7 @@ class PopupUI {
     // Get form elements
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
+    const editBtn = ruleElement.querySelector(".rule__edit-btn");
     const toggleActiveBtn = ruleElement.querySelector(".rule__toggle-btn");
     const deleteBtn = ruleElement.querySelector(".rule__delete-btn");
     const header = ruleElement.querySelector(".rule__header");
@@ -540,7 +541,13 @@ class PopupUI {
     // Add CSS to indicate it's editable
     ruleTitle.style.cursor = 'pointer';
     ruleTitle.title = 'Double-click to edit';
-
+    
+    // Add click event for edit button
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.makeRuleTitleEditable(ruleTitle, rule, index);
+    });
+    
     // Set initial values
     fromUrlInput.value = rule.fromUrl || "";
     toUrlInput.value = rule.toUrl || "";
@@ -584,10 +591,28 @@ class PopupUI {
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
 
+    const fromUrl = fromUrlInput.value.trim();
+    const toUrl = toUrlInput.value.trim();
+
+    // Remove any existing error styling
+    fromUrlInput.classList.remove("rule__input--error");
+    toUrlInput.classList.remove("rule__input--error");
+    this.removeValidationError(fromUrlInput);
+    this.removeValidationError(toUrlInput);
+
     const data = {
-      fromUrl: fromUrlInput.value,
-      toUrl: toUrlInput.value,
+      fromUrl: fromUrl,
+      toUrl: toUrl,
     };
+
+    // Check if URLs are valid
+    const isFromUrlValid = this.isValidRedirectUrl(fromUrl);
+    const isToUrlValid = this.isValidRedirectUrl(toUrl);
+
+    // If either URL is invalid, disable the rule
+    if (!isFromUrlValid || !isToUrlValid) {
+      data.disabled = true;
+    }
 
     this.ruleManager.updateRule(index, data);
     await this.ruleManager.saveRules();
@@ -598,6 +623,51 @@ class PopupUI {
     // Update rule status after changing URLs
     const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
     this.updateRuleStatus(ruleElement, rule, this.ruleManager.enabled && sectionEnabled);
+  }
+
+  /**
+   * Check if a URL is valid for redirection
+   */
+  isValidRedirectUrl(url) {
+    // URL must not be empty
+    if (!url) return false;
+    
+    // URL must start with http:// or https://
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
+    
+    // If URL contains wildcards, make sure they're valid
+    if (url.includes('**')) {
+      // Only one wildcard pattern is allowed
+      if ((url.match(/\*\*/g) || []).length > 1) return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Show validation error message
+   */
+  showValidationError(inputElement, message) {
+    // Remove any existing error message
+    this.removeValidationError(inputElement);
+    
+    // Create and add error message
+    const errorElement = document.createElement('div');
+    errorElement.className = 'rule__error-message';
+    errorElement.textContent = message;
+    
+    // Insert after the input element
+    inputElement.parentNode.insertBefore(errorElement, inputElement.nextSibling);
+  }
+
+  /**
+   * Remove validation error message
+   */
+  removeValidationError(inputElement) {
+    const errorElement = inputElement.parentNode.querySelector('.rule__error-message');
+    if (errorElement) {
+      errorElement.remove();
+    }
   }
 
   /**
@@ -1307,11 +1377,14 @@ class PopupUI {
    * Add a new rule to a specific section
    */
   async addNewRuleToSection(sectionName) {
-    // Create a new rule
+    // Create a new rule with default valid URLs
     const newRuleIndex = this.ruleManager.addRule();
     
-    // Set the section for this rule
-    this.ruleManager.rules[newRuleIndex].section = sectionName;
+    // Set the section for this rule and default valid URLs
+    const rule = this.ruleManager.rules[newRuleIndex];
+    rule.section = sectionName;
+    rule.fromUrl = 'https://example.com/**';
+    rule.toUrl = 'http://localhost:3000/**';
     
     // Save the rules
     await this.ruleManager.saveRules();
