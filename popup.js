@@ -4,7 +4,6 @@ document.addEventListener("DOMContentLoaded", () => {
     enableToggle: document.getElementById("enableToggle"),
     redirectCountElem: document.getElementById("redirectCount"),
     rulesContainer: document.getElementById("rulesContainer"),
-    addRuleBtn: document.getElementById("addRuleBtn"),
     ruleTemplate: document.getElementById("ruleTemplate"),
     debugBtn: document.getElementById("debugBtn"),
     debugPanel: document.getElementById("debugPanel"),
@@ -16,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tabContents: document.querySelectorAll(".debug__content"),
     redirectHistory: document.getElementById("redirectHistory"),
     toolsTab: document.getElementById("toolsTab"),
+    addSectionBtn: document.getElementById("addSectionBtn"),
   };
 
   // Create the main application
@@ -234,23 +234,21 @@ class RuleManager {
   addRule() {
     const newRule = new RedirectRule();
     this.rules.push(newRule);
-    return newRule;
+    return this.rules.length - 1; // Return the index of the new rule
   }
 
   /**
-   * Update a rule at the specified index
-   * @param {number} index - Index of the rule to update
+   * Update a rule with new data
+   * @param {number} index - Rule index
    * @param {object} data - New rule data
    */
   updateRule(index, data) {
     if (index >= 0 && index < this.rules.length) {
       const rule = this.rules[index];
-
-      if (data.fromUrl !== undefined) rule.fromUrl = data.fromUrl;
-      if (data.toUrl !== undefined) rule.toUrl = data.toUrl;
-      if (data.name !== undefined) rule.name = data.name;
-      if (data.disabled !== undefined) rule.disabled = data.disabled;
+      Object.assign(rule, data);
+      return true;
     }
+    return false;
   }
 
   /**
@@ -315,8 +313,6 @@ class PopupUI {
   constructor(elements, ruleManager) {
     this.elements = elements;
     this.ruleManager = ruleManager;
-    this.sectionsContainer = document.createElement('div');
-    this.sectionsContainer.className = 'sections-container';
   }
 
   /**
@@ -327,15 +323,8 @@ class PopupUI {
     this.setupEventListeners();
     this.setupTabs();
     
-    // Insert sections container before rules container
-    this.elements.rulesContainer.parentNode.insertBefore(
-      this.sectionsContainer, 
-      this.elements.rulesContainer
-    );
-    
-    // Display sections and rules
+    // Display sections (which will contain rules)
     this.displaySections();
-    this.displayRules();
     this.loadRedirectHistory();
   }
 
@@ -345,21 +334,8 @@ class PopupUI {
   setupEventListeners() {
     // Main controls
     this.elements.enableToggle.addEventListener("change", () => this.toggleRedirect());
-    this.elements.addRuleBtn.addEventListener("click", () => this.addNewRule());
+    this.elements.addSectionBtn.addEventListener("click", () => this.addNewSection());
     this.elements.debugBtn.addEventListener("click", () => this.toggleDebugPanel());
-
-    // Add new section button
-    const addSectionBtn = document.createElement("button");
-    addSectionBtn.id = "addSectionBtn";
-    addSectionBtn.className = "add-section";
-    addSectionBtn.textContent = "+ Add New Section";
-    addSectionBtn.addEventListener("click", () => this.addNewSection());
-    
-    // Insert the add section button before the add rule button
-    this.elements.addRuleBtn.parentNode.insertBefore(
-      addSectionBtn, 
-      this.elements.addRuleBtn
-    );
 
     // Debug panel event listeners
     this.elements.clearHistoryBtn.addEventListener("click", () => this.clearRedirectHistory());
@@ -423,28 +399,20 @@ class PopupUI {
    * Add a new rule
    */
   async addNewRule() {
-    const newRule = this.ruleManager.addRule();
-    await this.ruleManager.saveRules();
-
-    // Create and add the rule element to the DOM
-    const index = this.ruleManager.rules.length - 1;
-    const ruleElement = this.initializeRuleElement(newRule, index);
-    this.elements.rulesContainer.appendChild(ruleElement);
-
-    // Expand the newly added rule to allow immediate editing
-    setTimeout(() => {
-      ruleElement.classList.remove("rule--collapsed");
-      const icon = ruleElement.querySelector(".rule__collapse-icon i");
-      if (icon) {
-        icon.className = "fas fa-chevron-down";
-      }
-
-      // Focus on the From URL input field
-      const fromUrlInput = ruleElement.querySelector(".from-url-input");
-      if (fromUrlInput) {
-        fromUrlInput.focus();
-      }
-    }, 50);
+    // Check if there are any sections
+    const sections = this.ruleManager.getSections();
+    
+    if (sections.length === 0) {
+      // Create a default section
+      this.ruleManager.setSectionEnabled('Default', true);
+      await this.ruleManager.saveRules();
+      
+      // Add the rule to the default section
+      await this.addNewRuleToSection('Default');
+    } else {
+      // Add the rule to the first section
+      await this.addNewRuleToSection(sections[0]);
+    }
   }
 
   /**
@@ -536,25 +504,12 @@ class PopupUI {
     // Get form elements
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
-    const advancedBtn = ruleElement.querySelector(".advanced__btn");
+    const advancedToggle = ruleElement.querySelector(".advanced__toggle");
+    const advancedBtn = advancedToggle.querySelector(".advanced__btn");
     const advancedSections = ruleElement.querySelector(".advanced__sections");
     const toggleActiveBtn = ruleElement.querySelector(".rule__toggle-btn");
     const deleteBtn = ruleElement.querySelector(".rule__delete-btn");
     const header = ruleElement.querySelector(".rule__header");
-
-    // Add move to section button
-    const moveToSectionBtn = document.createElement("button");
-    moveToSectionBtn.className = "btn rule__section-btn";
-    moveToSectionBtn.title = "Move to Section";
-    moveToSectionBtn.innerHTML = '<i class="fas fa-folder"></i>';
-    moveToSectionBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.showSectionSelectionDialog(index);
-    });
-    
-    // Add the move to section button to the actions
-    const actions = ruleElement.querySelector(".rule__actions");
-    actions.insertBefore(moveToSectionBtn, toggleActiveBtn);
 
     // Ensure the rule is collapsed by default
     ruleElement.classList.add("rule--collapsed");
@@ -602,16 +557,14 @@ class PopupUI {
    * Set up advanced options for a rule
    */
   setupAdvancedOptions(ruleElement, rule, index) {
-    const advancedBtn = ruleElement.querySelector(".advanced__btn");
+    const advancedToggle = ruleElement.querySelector(".advanced__toggle");
+    const advancedBtn = advancedToggle.querySelector(".advanced__btn");
     const advancedSections = ruleElement.querySelector(".advanced__sections");
 
     // Toggle advanced options visibility
     advancedBtn.addEventListener("click", () => {
       const isVisible = advancedSections.style.display !== "none";
       advancedSections.style.display = isVisible ? "none" : "block";
-      advancedBtn.innerHTML = isVisible
-        ? '<i class="fas fa-cog"></i> Advanced Options'
-        : '<i class="fas fa-cog"></i> Hide Advanced Options';
     });
 
     // Set up name input
@@ -619,34 +572,18 @@ class PopupUI {
     nameInput.className = "rule__form-group";
     nameInput.innerHTML = `
       <label class="rule__label">Rule Name:</label>
-      <input type="text" class="rule__input name-input" placeholder="Optional name for this rule" value="${
+      <input type="text" class="rule__input name-input" placeholder="Optional rule name" value="${
         rule.name || ""
       }" />
-    `;
-    advancedSections.insertBefore(nameInput, advancedSections.firstChild);
-
-    // Set up section input
-    const sectionInput = document.createElement("div");
-    sectionInput.className = "rule__form-group";
-    sectionInput.innerHTML = `
-      <label class="rule__label">Section:</label>
-      <input type="text" class="rule__input section-input" placeholder="Optional section name" value="${
-        rule.section || ""
-      }" />
       <p class="rule__hint">
-        Group rules into sections. Disabling a section disables all rules in it.
+        Give your rule a descriptive name to help identify it.
       </p>
     `;
-    advancedSections.insertBefore(sectionInput, advancedSections.children[1]);
+    advancedSections.appendChild(nameInput);
 
-    // Add event listeners for name and section inputs
+    // Add event listeners for name input
     const nameInputElement = nameInput.querySelector(".name-input");
     nameInputElement.addEventListener("input", () => {
-      this.updateRuleFromForm(index, ruleElement);
-    });
-
-    const sectionInputElement = sectionInput.querySelector(".section-input");
-    sectionInputElement.addEventListener("input", () => {
       this.updateRuleFromForm(index, ruleElement);
     });
   }
@@ -658,26 +595,18 @@ class PopupUI {
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
     const nameInput = ruleElement.querySelector(".name-input");
-    const sectionInput = ruleElement.querySelector(".section-input");
 
     const data = {
       fromUrl: fromUrlInput.value,
       toUrl: toUrlInput.value,
       name: nameInput ? nameInput.value : "",
-      section: sectionInput ? sectionInput.value : ""
     };
 
     this.ruleManager.updateRule(index, data);
     await this.ruleManager.saveRules();
-
-    // Update the rule title
+    
     const rule = this.ruleManager.rules[index];
     this.updateRuleTitle(ruleElement, rule);
-
-    // If section changed, refresh sections display
-    if (sectionInput && sectionInput.value !== rule.section) {
-      this.displaySections();
-    }
   }
 
   /**
@@ -986,7 +915,6 @@ class PopupUI {
 
       // Update UI
       this.displayRules();
-      this.displaySections();
 
       // Show success message
       this.showImportExportStatus(
@@ -1030,7 +958,7 @@ class PopupUI {
    * Display all sections in the UI
    */
   displaySections() {
-    this.sectionsContainer.innerHTML = "";
+    this.elements.rulesContainer.innerHTML = "";
     
     const sections = this.ruleManager.getSections();
     
@@ -1040,7 +968,7 @@ class PopupUI {
     
     sections.forEach(sectionName => {
       const sectionElement = this.createSectionElement(sectionName);
-      this.sectionsContainer.appendChild(sectionElement);
+      this.elements.rulesContainer.appendChild(sectionElement);
     });
   }
   
@@ -1078,6 +1006,11 @@ class PopupUI {
     toggleBtn.title = 'Toggle Section Active State';
     toggleBtn.innerHTML = '<i class="fas fa-power-off"></i>';
     
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn section__edit-btn';
+    editBtn.title = 'Edit Section Name';
+    editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+    
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn section__delete-btn';
     deleteBtn.title = 'Delete Section';
@@ -1087,6 +1020,12 @@ class PopupUI {
     toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleSectionActive(sectionName);
+    });
+    
+    // Add event listener for edit button
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.editSectionName(sectionName);
     });
     
     // Add event listener for delete button
@@ -1100,12 +1039,28 @@ class PopupUI {
     titleContainer.appendChild(title);
     
     actions.appendChild(toggleBtn);
+    actions.appendChild(editBtn);
     actions.appendChild(deleteBtn);
     
     header.appendChild(titleContainer);
     header.appendChild(actions);
     
     sectionElement.appendChild(header);
+    
+    // Create a container for rules in this section
+    const rulesContainer = document.createElement('div');
+    rulesContainer.className = 'section__rules';
+    sectionElement.appendChild(rulesContainer);
+    
+    // Add the "Add Rule" button for this section
+    const addRuleBtn = document.createElement('button');
+    addRuleBtn.className = 'add-rule section__add-rule';
+    addRuleBtn.textContent = '+ Add Rule';
+    addRuleBtn.addEventListener('click', () => this.addNewRuleToSection(sectionName));
+    sectionElement.appendChild(addRuleBtn);
+    
+    // Display rules for this section
+    this.displayRulesForSection(sectionName, rulesContainer);
     
     return sectionElement;
   }
@@ -1154,18 +1109,15 @@ class PopupUI {
    * Add a new section
    */
   async addNewSection() {
-    // Prompt for section name
-    const sectionName = prompt("Enter a name for the new section:");
+    // Create a default section name
+    let sectionName = "New Section";
+    let counter = 1;
     
-    if (!sectionName || sectionName.trim() === "") {
-      return;
-    }
-    
-    // Check if section already exists
+    // Check if section already exists and generate a unique name
     const existingSections = this.ruleManager.getSections();
-    if (existingSections.includes(sectionName)) {
-      alert(`Section "${sectionName}" already exists.`);
-      return;
+    while (existingSections.includes(sectionName)) {
+      sectionName = `New Section ${counter}`;
+      counter++;
     }
     
     // Create the section
@@ -1174,6 +1126,11 @@ class PopupUI {
     
     // Update the UI
     this.displaySections();
+    
+    // Automatically prompt to edit the section name
+    setTimeout(() => {
+      this.editSectionName(sectionName);
+    }, 100);
   }
 
   /**
@@ -1222,142 +1179,70 @@ class PopupUI {
   }
 
   /**
-   * Show section selection dialog for a rule
+   * Display rules for a specific section
    */
-  showSectionSelectionDialog(ruleIndex) {
-    const rule = this.ruleManager.rules[ruleIndex];
-    if (!rule) return;
+  displayRulesForSection(sectionName, container) {
+    // Get rules for this section
+    const rulesForSection = this.ruleManager.rules.filter((rule, index) => 
+      rule.section === sectionName
+    );
     
-    // Create dialog overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'dialog-overlay';
-    
-    // Create dialog
-    const dialog = document.createElement('div');
-    dialog.className = 'dialog';
-    
-    // Create dialog content
-    const heading = document.createElement('h3');
-    heading.className = 'dialog__heading';
-    heading.textContent = 'Select Section';
-    
-    const content = document.createElement('div');
-    content.className = 'dialog__content';
-    
-    // Get all sections
-    const sections = this.ruleManager.getSections();
-    
-    // Create section options
-    const sectionOptions = document.createElement('div');
-    sectionOptions.className = 'section-options';
-    
-    // Add "No Section" option
-    const noSectionOption = document.createElement('div');
-    noSectionOption.className = 'section-option';
-    noSectionOption.innerHTML = `
-      <label>
-        <input type="radio" name="section" value="" ${!rule.section ? 'checked' : ''}>
-        <span>No Section</span>
-      </label>
-    `;
-    sectionOptions.appendChild(noSectionOption);
-    
-    // Add existing sections
-    sections.forEach(sectionName => {
-      const sectionOption = document.createElement('div');
-      sectionOption.className = 'section-option';
-      sectionOption.innerHTML = `
-        <label>
-          <input type="radio" name="section" value="${sectionName}" ${rule.section === sectionName ? 'checked' : ''}>
-          <span>${sectionName}</span>
-        </label>
-      `;
-      sectionOptions.appendChild(sectionOption);
+    // Display each rule
+    rulesForSection.forEach((rule, i) => {
+      // Find the actual index in the full rules array
+      const index = this.ruleManager.rules.findIndex(r => r === rule);
+      const ruleElement = this.initializeRuleElement(rule, index);
+      container.appendChild(ruleElement);
     });
+  }
+
+  /**
+   * Add a new rule to a specific section
+   */
+  async addNewRuleToSection(sectionName) {
+    // Create a new rule
+    const newRuleIndex = this.ruleManager.addRule();
     
-    // Add "Create New Section" option
-    const newSectionOption = document.createElement('div');
-    newSectionOption.className = 'section-option section-option--new';
-    newSectionOption.innerHTML = `
-      <label>
-        <input type="radio" name="section" value="new">
-        <span>Create New Section</span>
-      </label>
-      <input type="text" class="section-option__input" placeholder="New section name" style="display: none;">
-    `;
-    sectionOptions.appendChild(newSectionOption);
+    // Set the section for this rule
+    this.ruleManager.rules[newRuleIndex].section = sectionName;
     
-    // Add event listener for "Create New Section" option
-    const newSectionRadio = newSectionOption.querySelector('input[type="radio"]');
-    const newSectionInput = newSectionOption.querySelector('.section-option__input');
+    // Save the rules
+    await this.ruleManager.saveRules();
     
-    newSectionRadio.addEventListener('change', () => {
-      if (newSectionRadio.checked) {
-        newSectionInput.style.display = 'block';
-        newSectionInput.focus();
+    // Refresh the sections display
+    this.displaySections();
+  }
+
+  /**
+   * Edit section name
+   */
+  async editSectionName(sectionName) {
+    // Prompt for new section name
+    const newName = prompt("Enter a new name for the section:");
+    
+    if (!newName || newName.trim() === "") {
+      return;
+    }
+    
+    // Check if section already exists
+    const existingSections = this.ruleManager.getSections();
+    if (existingSections.includes(newName)) {
+      alert(`Section "${newName}" already exists.`);
+      return;
+    }
+    
+    // Update section name
+    this.ruleManager.rules.forEach(rule => {
+      if (rule.section === sectionName) {
+        rule.section = newName;
       }
     });
     
-    // Add buttons
-    const buttons = document.createElement('div');
-    buttons.className = 'dialog__buttons';
+    // Save changes
+    await this.ruleManager.saveRules();
     
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'btn dialog__btn';
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.addEventListener('click', () => {
-      document.body.removeChild(overlay);
-    });
-    
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'btn dialog__btn btn--primary';
-    saveBtn.textContent = 'Save';
-    saveBtn.addEventListener('click', async () => {
-      const selectedOption = dialog.querySelector('input[name="section"]:checked');
-      if (selectedOption) {
-        let selectedSection = selectedOption.value;
-        
-        // Handle "Create New Section" option
-        if (selectedSection === 'new') {
-          const newSectionName = newSectionInput.value.trim();
-          if (newSectionName) {
-            // Check if section already exists
-            if (sections.includes(newSectionName)) {
-              alert(`Section "${newSectionName}" already exists.`);
-              return;
-            }
-            
-            // Create new section
-            this.ruleManager.setSectionEnabled(newSectionName, true);
-            selectedSection = newSectionName;
-          } else {
-            alert('Please enter a name for the new section.');
-            return;
-          }
-        }
-        
-        // Move rule to selected section
-        await this.moveRuleToSection(ruleIndex, selectedSection);
-        
-        // Close dialog
-        document.body.removeChild(overlay);
-      }
-    });
-    
-    buttons.appendChild(cancelBtn);
-    buttons.appendChild(saveBtn);
-    
-    // Assemble dialog
-    content.appendChild(sectionOptions);
-    
-    dialog.appendChild(heading);
-    dialog.appendChild(content);
-    dialog.appendChild(buttons);
-    
-    overlay.appendChild(dialog);
-    
-    // Add dialog to body
-    document.body.appendChild(overlay);
+    // Update UI
+    this.displaySections();
   }
 }
 
