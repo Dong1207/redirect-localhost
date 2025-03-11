@@ -18,8 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
     testUrlInput: document.getElementById("testUrlInput"),
     testUrlBtn: document.getElementById("testUrlBtn"),
     testUrlResult: document.getElementById("testUrlResult"),
-    tabs: document.querySelectorAll(".tab"),
-    tabContents: document.querySelectorAll(".tab-content"),
+    tabs: document.querySelectorAll(".debug__tab"),
+    tabContents: document.querySelectorAll(".debug__content"),
     redirectHistory: document.getElementById("redirectHistory"),
     toolsTab: document.getElementById("toolsTab"),
   };
@@ -79,15 +79,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Storage and settings functions
   function loadSettings() {
+    console.log("Loading settings from storage...");
+
     chrome.storage.local.get(["redirectRules", "enabled"], (result) => {
+      // Check if we have rules in storage
+      if (result.redirectRules && Array.isArray(result.redirectRules)) {
+        console.log("Loaded rules from storage:", result.redirectRules);
+        redirectRules = result.redirectRules;
+      } else {
+        console.log("No rules found in storage, initializing empty array");
+        redirectRules = [];
+      }
+
+      // Set the enabled toggle state
       elements.enableToggle.checked = result.enabled || false;
-      redirectRules = result.redirectRules || [];
+
+      // Display the rules
       displayRules();
     });
   }
 
   function saveRules() {
-    chrome.storage.local.set({redirectRules});
+    // Log the rules being saved for debugging
+    console.log("Saving rules to storage:", redirectRules);
+
+    // Save to Chrome storage
+    chrome.storage.local.set({redirectRules}, () => {
+      // Check for any error
+      if (chrome.runtime.lastError) {
+        console.error("Error saving rules:", chrome.runtime.lastError);
+      } else {
+        console.log("Rules saved successfully");
+
+        // Notify the background script about the rule update
+        chrome.runtime.sendMessage({action: "rulesUpdated"}, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "Error notifying background script:",
+              chrome.runtime.lastError
+            );
+          } else if (response?.success) {
+            console.log("Background script updated successfully");
+          }
+        });
+      }
+    });
   }
 
   function toggleRedirect() {
@@ -98,9 +134,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // UI update functions
   function displayRules() {
     elements.rulesContainer.innerHTML = "";
+
+    // Log the rules for debugging
+    console.log("Displaying rules:", redirectRules);
+
+    if (redirectRules.length === 0) {
+      console.log("No rules to display");
+      return;
+    }
+
     redirectRules.forEach((rule, index) => {
-      elements.rulesContainer.appendChild(createRuleElement(rule, index));
+      // Use initializeRuleElement instead of createRuleElement
+      const ruleElement = initializeRuleElement(rule, index);
+      elements.rulesContainer.appendChild(ruleElement);
+
+      // Log each rule for debugging
+      console.log(`Rule ${index} displayed:`, rule);
     });
+
     updateAllRuleStatuses();
   }
 
@@ -120,14 +171,19 @@ document.addEventListener("DOMContentLoaded", () => {
   function setupTabs() {
     elements.tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
-        // Remove active class from all tabs and contents
-        elements.tabs.forEach((t) => t.classList.remove("active"));
-        elements.tabContents.forEach((c) => c.classList.remove("active"));
+        const tabId = tab.getAttribute("data-tab");
 
-        // Add active class to selected tab and content
-        tab.classList.add("active");
-        const tabContentId = tab.getAttribute("data-tab") + "Tab";
-        document.getElementById(tabContentId).classList.add("active");
+        // Update active tab
+        elements.tabs.forEach((t) => t.classList.remove("debug__tab--active"));
+        tab.classList.add("debug__tab--active");
+
+        // Update active content
+        elements.tabContents.forEach((content) => {
+          content.classList.remove("debug__content--active");
+        });
+        document
+          .getElementById(`${tabId}Tab`)
+          .classList.add("debug__content--active");
       });
     });
   }
@@ -145,40 +201,58 @@ document.addEventListener("DOMContentLoaded", () => {
         "xmlhttprequest",
         "other",
       ],
+      disabled: false,
     };
 
+    // Add the new rule to the array
     redirectRules.push(newRule);
+
+    // Save to storage immediately
     saveRules();
 
-    elements.rulesContainer.appendChild(
-      createRuleElement(newRule, redirectRules.length - 1)
-    );
+    // Create and add the rule element to the DOM
+    const index = redirectRules.length - 1;
+    const ruleElement = initializeRuleElement(newRule, index);
+    elements.rulesContainer.appendChild(ruleElement);
+
+    // Focus on the From URL input field
+    setTimeout(() => {
+      const fromUrlInput = ruleElement.querySelector(".from-url-input");
+      if (fromUrlInput) {
+        fromUrlInput.focus();
+      }
+    }, 100);
   }
 
   function updateRule(index) {
-    const ruleElement = document.querySelector(
-      `.rule-item[data-rule-index="${index}"]`
-    );
+    const ruleElement = document.querySelector(`.rule[data-index="${index}"]`);
     if (!ruleElement) return;
 
-    const fromUrl = ruleElement.querySelector(".from-url-input").value;
-    const toUrl = ruleElement.querySelector(".to-url-input").value;
+    // Get values from input fields
+    const fromUrl = ruleElement.querySelector(".from-url-input").value.trim();
+    const toUrl = ruleElement.querySelector(".to-url-input").value.trim();
 
     // Get the disabled state from the rule object, not from the DOM
     const isDisabled = redirectRules[index]?.disabled === true;
 
     const resourceCheckboxes = ruleElement.querySelectorAll(
-      ".resource-types input:checked"
+      ".advanced__resource-types input:checked"
     );
     const resourceTypes = Array.from(resourceCheckboxes).map((cb) => cb.value);
 
+    // Update the rule in the array
     redirectRules[index] = {
       fromUrl,
       toUrl,
       resourceTypes,
       disabled: isDisabled,
     };
+
+    // Save to storage
     saveRules();
+
+    // Log for debugging
+    console.log(`Rule ${index} updated:`, redirectRules[index]);
   }
 
   function deleteRule(index) {
@@ -218,41 +292,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Status indicator updates
   function updateRuleStatus(ruleElement, rule, isEnabled) {
-    const statusIndicator = ruleElement.querySelector(".rule-status");
-    const toggleActiveBtn = ruleElement.querySelector(".toggle-active-btn");
+    const statusIndicator = ruleElement.querySelector(".rule__status");
+    const toggleBtn = ruleElement.querySelector(".rule__toggle-btn");
 
-    // Check if the rule is disabled specifically
-    const isRuleActive =
-      !rule.disabled && isEnabled && rule.fromUrl && rule.toUrl;
-
-    // Update only the status indicator
-    statusIndicator.classList.toggle("active", isRuleActive);
-    statusIndicator.classList.toggle("inactive", !isRuleActive);
-
-    // Set appropriate titles
-    if (isRuleActive) {
-      statusIndicator.title = "Rule is active";
-      toggleActiveBtn.title = "Disable Rule";
-    } else if (rule.disabled) {
-      statusIndicator.title = "Rule is manually disabled";
-      toggleActiveBtn.title = "Enable Rule";
-    } else if (!isEnabled) {
-      statusIndicator.title = "Extension is disabled";
-      toggleActiveBtn.title = rule.disabled ? "Enable Rule" : "Disable Rule";
+    if (rule.disabled || !isEnabled) {
+      statusIndicator.classList.remove("rule__status--active");
+      statusIndicator.classList.add("rule__status--inactive");
+      toggleBtn.classList.add("rule__toggle-btn--inactive");
+      ruleElement.setAttribute("data-disabled", "true");
     } else {
-      statusIndicator.title = "Rule is incomplete (missing URL)";
-      toggleActiveBtn.title = rule.disabled ? "Enable Rule" : "Disable Rule";
+      statusIndicator.classList.add("rule__status--active");
+      statusIndicator.classList.remove("rule__status--inactive");
+      toggleBtn.classList.remove("rule__toggle-btn--inactive");
+      ruleElement.removeAttribute("data-disabled");
     }
-
-    // Only update the toggle button appearance, not the entire rule
-    toggleActiveBtn.classList.toggle("inactive", rule.disabled);
   }
 
   function updateAllRuleStatuses() {
     chrome.storage.local.get(["enabled"], (result) => {
       const isEnabled = result.enabled === true;
-      document.querySelectorAll(".rule-item").forEach((ruleElement) => {
-        const ruleIndex = ruleElement.dataset.ruleIndex;
+      document.querySelectorAll(".rule").forEach((ruleElement) => {
+        const ruleIndex = ruleElement.dataset.index;
         if (ruleIndex !== undefined && redirectRules[ruleIndex]) {
           updateRuleStatus(ruleElement, redirectRules[ruleIndex], isEnabled);
         }
@@ -262,16 +322,71 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // UI element creation
   function createRuleElement(rule = {}, index) {
-    const {
-      element,
-      fromUrlInput,
-      toUrlInput,
-      advancedBtn,
-      advancedSections,
-      toggleActiveBtn,
-    } = initializeRuleElement(rule, index);
+    const clone = document.importNode(elements.ruleTemplate.content, true);
+    const ruleElement = clone.querySelector(".rule");
 
-    attachRuleEventListeners(element, rule, index, {
+    ruleElement.setAttribute("data-index", index);
+    if (rule.disabled) {
+      ruleElement.setAttribute("data-disabled", "true");
+    }
+
+    return ruleElement;
+  }
+
+  function initializeRuleElement(rule, index) {
+    const ruleElement = createRuleElement(rule, index);
+
+    // Get form elements
+    const fromUrlInput = ruleElement.querySelector(".from-url-input");
+    const toUrlInput = ruleElement.querySelector(".to-url-input");
+    const advancedBtn = ruleElement.querySelector(".advanced__btn");
+    const advancedSections = ruleElement.querySelector(".advanced__sections");
+    const toggleActiveBtn = ruleElement.querySelector(".rule__toggle-btn");
+    const deleteBtn = ruleElement.querySelector(".rule__delete-btn");
+    const header = ruleElement.querySelector(".rule__header");
+
+    // Set initial values - ensure we're using the correct property names
+    fromUrlInput.value = rule.fromUrl || "";
+    toUrlInput.value = rule.toUrl || "";
+
+    // Set up resource type checkboxes
+    if (rule.resourceTypes && rule.resourceTypes.length > 0) {
+      const checkboxes = ruleElement.querySelectorAll(
+        ".advanced__resource-types input"
+      );
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = rule.resourceTypes.includes(checkbox.value);
+      });
+    }
+
+    // Set up event listeners
+    header.addEventListener("click", (e) => {
+      if (!e.target.closest(".rule__actions")) {
+        ruleElement.classList.toggle("rule--collapsed");
+      }
+    });
+
+    deleteBtn.addEventListener("click", () => deleteRule(index));
+
+    toggleActiveBtn.addEventListener("click", () => {
+      rule.disabled = !rule.disabled;
+      updateRuleStatus(ruleElement, rule, elements.enableToggle.checked);
+      saveRules();
+    });
+
+    advancedBtn.addEventListener("click", () => {
+      advancedSections.style.display =
+        advancedSections.style.display === "none" ||
+        !advancedSections.style.display
+          ? "block"
+          : "none";
+    });
+
+    // Set up test functionality
+    setupTestFunctionality(ruleElement, rule);
+
+    // Attach input event listeners
+    attachRuleEventListeners(ruleElement, rule, index, {
       fromUrlInput,
       toUrlInput,
       advancedBtn,
@@ -279,57 +394,11 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleActiveBtn,
     });
 
-    return element;
-  }
+    // Update rule title and status
+    updateRuleTitle(ruleElement, rule);
+    updateRuleStatus(ruleElement, rule, elements.enableToggle.checked);
 
-  function initializeRuleElement(rule, index) {
-    const ruleClone = document.importNode(elements.ruleTemplate.content, true);
-    const element = ruleClone.querySelector(".rule-item");
-
-    const fromUrlInput = element.querySelector(".from-url-input");
-    const toUrlInput = element.querySelector(".to-url-input");
-    const advancedBtn = element.querySelector(".advanced-btn");
-    const advancedSections = element.querySelector(".advanced-sections");
-    const toggleActiveBtn = element.querySelector(".toggle-active-btn");
-
-    // Set initial values
-    fromUrlInput.value = rule.fromUrl || "";
-    toUrlInput.value = rule.toUrl || "";
-    element.dataset.ruleIndex = index;
-
-    // Update toggle button state but don't set disabled attribute on the rule element
-    if (rule.disabled) {
-      toggleActiveBtn.classList.add("inactive");
-      toggleActiveBtn.title = "Enable Rule";
-    } else {
-      toggleActiveBtn.title = "Disable Rule";
-    }
-
-    // Update rule title
-    const ruleTitle = element.querySelector(".rule-title");
-    if (rule.fromUrl && rule.toUrl) {
-      const fromDomain = extractDomain(rule.fromUrl);
-      const toDomain = extractDomain(rule.toUrl);
-      ruleTitle.textContent = `${fromDomain} => ${toDomain}`;
-    } else {
-      ruleTitle.textContent = "New Rule";
-    }
-
-    // Set resource types checkboxes
-    if (rule.resourceTypes && rule.resourceTypes.length > 0) {
-      element.querySelectorAll(".resource-types input").forEach((cb) => {
-        cb.checked = rule.resourceTypes.includes(cb.value);
-      });
-    }
-
-    return {
-      element,
-      fromUrlInput,
-      toUrlInput,
-      advancedBtn,
-      advancedSections,
-      toggleActiveBtn,
-    };
+    return ruleElement;
   }
 
   function attachRuleEventListeners(
@@ -340,7 +409,9 @@ document.addEventListener("DOMContentLoaded", () => {
   ) {
     // Advanced options toggle
     advancedBtn.addEventListener("click", () => {
-      const isHidden = advancedSections.style.display === "none";
+      const isHidden =
+        advancedSections.style.display === "none" ||
+        !advancedSections.style.display;
       advancedSections.style.display = isHidden ? "block" : "none";
       advancedBtn.innerHTML = isHidden
         ? '<i class="fas fa-cog"></i> Hide Advanced Options'
@@ -360,12 +431,20 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     };
 
+    // Add both input and change event listeners to catch all changes
+    fromUrlInput.addEventListener("input", updateHandler);
     fromUrlInput.addEventListener("change", updateHandler);
-    toUrlInput.addEventListener("change", updateHandler);
+    fromUrlInput.addEventListener("blur", updateHandler);
 
-    element.querySelectorAll(".resource-types input").forEach((checkbox) => {
-      checkbox.addEventListener("change", () => updateRule(index));
-    });
+    toUrlInput.addEventListener("input", updateHandler);
+    toUrlInput.addEventListener("change", updateHandler);
+    toUrlInput.addEventListener("blur", updateHandler);
+
+    element
+      .querySelectorAll(".advanced__resource-types input")
+      .forEach((checkbox) => {
+        checkbox.addEventListener("change", () => updateRule(index));
+      });
 
     // Toggle active button
     toggleActiveBtn.addEventListener("click", (e) => {
@@ -385,17 +464,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Delete button
-    element.querySelector(".delete-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      deleteRule(index);
-    });
+    element
+      .querySelector(".rule__delete-btn")
+      .addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteRule(index);
+      });
 
     // Collapse functionality
-    const ruleHeader = element.querySelector(".rule-header");
+    const ruleHeader = element.querySelector(".rule__header");
     ruleHeader.addEventListener("click", () => {
-      element.classList.toggle("collapsed");
+      element.classList.toggle("rule--collapsed");
       const icon = ruleHeader.querySelector(".collapse-icon i");
-      icon.className = element.classList.contains("collapsed")
+      icon.className = element.classList.contains("rule--collapsed")
         ? "fas fa-chevron-right"
         : "fas fa-chevron-down";
     });
@@ -410,7 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateRuleTitle(ruleElement, rule) {
-    const ruleTitle = ruleElement.querySelector(".rule-title");
+    const ruleTitle = ruleElement.querySelector(".rule__title");
     if (rule.fromUrl && rule.toUrl) {
       const fromDomain = extractDomain(rule.fromUrl);
       const toDomain = extractDomain(rule.toUrl);
@@ -421,83 +502,89 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setupTestFunctionality(element, rule) {
-    const testBtn = element.querySelector(".test-btn");
-    const testInput = element.querySelector(".test-input");
-    const testResult = element.querySelector(".test-result");
+    const testInput = element.querySelector(".advanced__test-input");
+    const testBtn = element.querySelector(".advanced__test-btn");
+    const testResult = element.querySelector(".advanced__test-result");
 
-    testBtn.addEventListener("click", async () => {
+    testBtn.addEventListener("click", () => {
       const inputUrl = testInput.value.trim();
       if (!inputUrl) {
         testResult.textContent = "Please enter a URL to test";
-        testResult.className = "test-result error";
+        testResult.style.display = "block";
+        testResult.className = "advanced__test-result test-result error";
         return;
       }
 
-      const redirectedUrl = await testRedirect(inputUrl, rule);
-      if (redirectedUrl) {
-        testResult.innerHTML = `Will redirect to:<br><strong>${redirectedUrl}</strong>`;
-        testResult.className = "test-result success";
+      const result = testRedirect(inputUrl, rule);
+      if (result.matches) {
+        testResult.innerHTML = `✅ Match! Will redirect to:<br>${result.redirectUrl}`;
+        testResult.className = "advanced__test-result test-result success";
       } else {
-        testResult.innerHTML = `
-          URL doesn't match this rule pattern<br>
-          <small>Input: ${inputUrl}<br>Pattern: ${rule.fromUrl}</small>
-        `;
-        testResult.className = "test-result error";
+        testResult.textContent = "❌ No match. This URL won't be redirected.";
+        testResult.className = "advanced__test-result test-result error";
       }
+      testResult.style.display = "block";
     });
   }
 
   // Debug panel functions
   function toggleDebugPanel() {
-    const isHidden = elements.debugPanel.style.display === "none";
-    elements.debugPanel.style.display = isHidden ? "block" : "none";
+    elements.debugPanel.classList.toggle("hidden");
 
-    if (isHidden) {
-      elements.debugBtn.style.backgroundColor = "#2196F3";
-      elements.debugBtn.style.color = "white";
+    // If the panel is now visible, load the redirect history
+    if (!elements.debugPanel.classList.contains("hidden")) {
       loadRedirectHistory();
-    } else {
-      elements.debugBtn.style.backgroundColor = "";
-      elements.debugBtn.style.color = "";
+
+      // Make sure the first tab is active
+      elements.tabs.forEach((tab, index) => {
+        if (index === 0) {
+          tab.classList.add("debug__tab--active");
+        } else {
+          tab.classList.remove("debug__tab--active");
+        }
+      });
+
+      elements.tabContents.forEach((content, index) => {
+        if (index === 0) {
+          content.classList.add("debug__content--active");
+        } else {
+          content.classList.remove("debug__content--active");
+        }
+      });
     }
   }
 
   function loadRedirectHistory() {
-    chrome.runtime.sendMessage({action: "getRedirectHistory"}, (response) => {
-      if (!elements.redirectHistory) return;
+    chrome.storage.local.get(["redirectHistory"], (result) => {
+      const history = result.redirectHistory || [];
+      elements.redirectHistory.innerHTML = "";
 
-      if (!response?.history?.length) {
+      if (history.length === 0) {
         elements.redirectHistory.innerHTML =
           '<div class="history-empty">No redirects recorded yet.</div>';
         return;
       }
 
-      // Build history HTML using DocumentFragment for better performance
-      const fragment = document.createDocumentFragment();
-      response.history.forEach((item) => {
+      // Sort by timestamp descending (newest first)
+      history.sort((a, b) => b.timestamp - a.timestamp);
+
+      history.forEach((item) => {
         const historyItem = document.createElement("div");
-        historyItem.className = "history-item";
+        historyItem.className = "history__item";
 
-        const timeDiv = document.createElement("div");
-        timeDiv.className = "history-time";
-        timeDiv.textContent = new Date(item.timestamp).toLocaleTimeString();
+        const fromUrl = truncateUrl(item.fromUrl, 60);
+        const toUrl = truncateUrl(item.toUrl, 60);
+        const date = new Date(item.timestamp);
+        const timeString = date.toLocaleTimeString();
 
-        const fromDiv = document.createElement("div");
-        fromDiv.className = "history-from";
-        fromDiv.textContent = truncateUrl(item.fromUrl, 60);
+        historyItem.innerHTML = `
+          <div class="history__from">${fromUrl}</div>
+          <div class="history__to">${toUrl}</div>
+          <div class="history__time">${timeString}</div>
+        `;
 
-        const toDiv = document.createElement("div");
-        toDiv.className = "history-to";
-        toDiv.textContent = truncateUrl(item.toUrl, 60);
-
-        historyItem.appendChild(timeDiv);
-        historyItem.appendChild(fromDiv);
-        historyItem.appendChild(toDiv);
-        fragment.appendChild(historyItem);
+        elements.redirectHistory.appendChild(historyItem);
       });
-
-      elements.redirectHistory.innerHTML = "";
-      elements.redirectHistory.appendChild(fragment);
     });
   }
 
@@ -611,16 +698,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showImportExportStatus(message, isSuccess) {
     const statusElement = document.createElement("div");
-    statusElement.className = `import-export-status ${
+    statusElement.className = `import-export__status ${
       isSuccess ? "success" : "error"
     }`;
     statusElement.textContent = message;
-    elements.toolsTab.appendChild(statusElement);
 
+    const container = elements.importRulesBtn.closest(".import-export");
+
+    // Remove any existing status messages
+    const existingStatus = container.querySelector(".import-export__status");
+    if (existingStatus) {
+      existingStatus.remove();
+    }
+
+    container.appendChild(statusElement);
+
+    // Auto-remove after 5 seconds
     setTimeout(() => {
-      if (elements.toolsTab.contains(statusElement)) {
-        elements.toolsTab.removeChild(statusElement);
-      }
+      statusElement.remove();
     }, 5000);
   }
 
@@ -782,89 +877,55 @@ document.addEventListener("DOMContentLoaded", () => {
   function testUrl() {
     const url = elements.testUrlInput.value.trim();
     if (!url) {
-      elements.testUrlResult.innerHTML =
-        '<div class="test-result error">Please enter a URL to test</div>';
-      elements.testUrlResult.style.display = "block";
+      elements.testUrlResult.textContent = "Please enter a URL to test";
+      elements.testUrlResult.className = "test-url__result error";
+      elements.testUrlResult.classList.remove("hidden");
       return;
     }
 
     // Find matching rules
-    chrome.storage.local.get(["redirectRules", "enabled"], (result) => {
-      const rules = result.redirectRules || [];
-      const isEnabled = result.enabled === true;
+    let matchFound = false;
+    let matchingRules = [];
 
-      if (!isEnabled) {
-        elements.testUrlResult.innerHTML =
-          '<div class="test-result error">Extension is disabled. Enable it to use redirects.</div>';
-        elements.testUrlResult.style.display = "block";
-        return;
-      }
-
-      if (rules.length === 0) {
-        elements.testUrlResult.innerHTML =
-          '<div class="test-result error">No redirect rules defined.</div>';
-        elements.testUrlResult.style.display = "block";
-        return;
-      }
-
-      // Test each rule
-      let matchFound = false;
-      let html = '<div class="test-result">';
-
-      // Create promises for each rule test
-      const testPromises = rules.map((rule) => {
-        return new Promise((resolve) => {
-          chrome.runtime.sendMessage(
-            {
-              action: "testUrlMatch",
-              inputUrl: url,
-              rule: rule,
-            },
-            (response) => {
-              if (response && response.matched) {
-                matchFound = true;
-                resolve({
-                  matched: true,
-                  rule,
-                  redirectUrl: response.redirectUrl,
-                  wildcardContent: response.wildcardContent,
-                });
-              } else {
-                resolve({matched: false, rule});
-              }
-            }
-          );
-        });
-      });
-
-      // Wait for all tests to complete
-      Promise.all(testPromises).then((results) => {
-        results.forEach((result) => {
-          if (result.matched) {
-            html += `
-              <div style="margin-bottom:10px; padding:8px; background:#d4edda; border-radius:4px; color:#155724;">
-                <strong>✓ Match found!</strong><br>
-                Rule: ${result.rule.fromUrl} → ${result.rule.toUrl}<br>
-                Redirect to: ${result.redirectUrl}
-                ${
-                  result.wildcardContent
-                    ? `<br>Wildcard content: ${result.wildcardContent}`
-                    : ""
-                }
-              </div>
-            `;
-          }
-        });
-
-        if (!matchFound) {
-          html +=
-            '<div style="color:#721c24">No matching rules found for this URL.</div>';
+    redirectRules.forEach((rule, index) => {
+      if (!rule.disabled) {
+        const result = testRedirect(url, rule);
+        if (result.matches) {
+          matchFound = true;
+          matchingRules.push({
+            index,
+            rule,
+            redirectUrl: result.redirectUrl,
+          });
         }
-
-        html += "</div>";
-        elements.testUrlResult.innerHTML = html;
-        elements.testUrlResult.style.display = "block";
-      });
+      }
     });
+
+    // Display results
+    if (matchFound) {
+      let resultHTML = `<div class="test-url__result-header success">✅ URL will be redirected</div>`;
+
+      matchingRules.forEach(({rule, redirectUrl, index}) => {
+        resultHTML += `
+          <div class="test-url__result-item">
+            <div class="test-url__result-rule">Rule #${
+              index + 1
+            }: ${extractDomain(rule.fromUrl)} → ${extractDomain(
+          rule.toUrl
+        )}</div>
+            <div class="test-url__result-redirect">Redirects to: ${redirectUrl}</div>
+          </div>
+        `;
+      });
+
+      elements.testUrlResult.innerHTML = resultHTML;
+      elements.testUrlResult.className = "test-url__result success";
+    } else {
+      elements.testUrlResult.textContent =
+        "❌ No matching rules found. URL won't be redirected.";
+      elements.testUrlResult.className = "test-url__result error";
+    }
+
+    elements.testUrlResult.classList.remove("hidden");
   }
 });

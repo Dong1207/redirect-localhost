@@ -10,219 +10,198 @@
   </head>
   <body>
     <div class="container">
-      <h1>Localhost Redirect</h1>
+      <h1 class="header">Localhost Redirect</h1>
 
-      <div class="enable-toggle">
-        <label class="switch">
-          <input type="checkbox" id="enableToggle" />
-          <span class="slider round"></span>
+      <div class="toggle">
+        <label class="toggle__switch switch">
+          <input type="checkbox" id="enableToggle" class="toggle__input" />
+          <span class="toggle__slider toggle__slider--round slider round"></span>
         </label>
-        <span>Enable Redirect</span>
+        <span class="toggle__label">Enable Redirect</span>
 
-        <div
-          id="control-buttons"
-          style="margin-left: auto; display: flex; gap: 8px"
-        >
-          <button
-            id="debugBtn"
-            class="btn"
-            style="font-size: 12px; padding: 4px 8px"
-          >
+        <div class="controls">
+          <button id="debugBtn" class="btn controls__btn">
             <i class="fas fa-bug"></i> Debug
           </button>
-          <button
-            id="diagBtn"
-            class="btn"
-            style="font-size: 12px; padding: 4px 8px"
-          >
+          <button id="diagBtn" class="btn controls__btn">
             <i class="fas fa-stethoscope"></i> Diagnose
           </button>
         </div>
       </div>
 
       <div class="stats">
-        <p>Redirected requests: <span id="redirectCount">0</span></p>
+        <p class="stats__text">Redirected requests: <span id="redirectCount">0</span></p>
       </div>
 
       <!-- Debug panel (initially hidden) -->
-      <div id="debugPanel" class="debug-section" style="display: none">
-        <div class="tab-container">
-          <div class="tab active" data-tab="history">Redirect History</div>
-          <div class="tab" data-tab="tools">Debug Tools</div>
-          <div class="tab" data-tab="test">URL Tester</div>
+      <div id="debugPanel" class="debug hidden">
+        <div class="debug__tabs">
+          <div class="debug__tab debug__tab--active" data-tab="history">Redirect History</div>
+          <div class="debug__tab" data-tab="tools">Debug Tools</div>
+          <div class="debug__tab" data-tab="test">URL Tester</div>
         </div>
 
-        <div id="historyTab" class="tab-content active">
-          <div class="toggle-switch">
-            <label class="switch" style="transform: scale(0.8)">
-              <input type="checkbox" id="debugToPageToggle" />
-              <span class="slider round"></span>
+        <div id="historyTab" class="debug__content debug__content--active">
+          <div class="debug-toggle">
+            <label class="toggle__switch switch debug-toggle__switch">
+              <input type="checkbox" id="debugToPageToggle" class="toggle__input" />
+              <span class="toggle__slider toggle__slider--round slider round"></span>
             </label>
-            <label for="debugToPageToggle">Log to page console</label>
+            <label for="debugToPageToggle" class="debug-toggle__label">Log to page console</label>
 
-            <button
-              id="clearHistoryBtn"
-              class="btn"
-              style="margin-left: auto; font-size: 11px; padding: 3px 6px"
-            >
+            <button id="clearHistoryBtn" class="btn debug-toggle__btn">
               Clear History
             </button>
           </div>
 
-          <div id="redirectHistory" style="margin-top: 10px">
+          <div id="redirectHistory" class="history">
             <div class="history-empty">No redirects recorded yet.</div>
           </div>
         </div>
 
-        <div id="toolsTab" class="tab-content">
-          <div style="margin-bottom: 10px">
-            <button id="checkRulesBtn" class="btn diag-btn" style="width: 100%">
+        <div id="toolsTab" class="debug__content">
+          <div class="tools__item">
+            <button id="checkRulesBtn" class="btn tools__btn">
               <i class="fas fa-list"></i> Check Active Rules
             </button>
           </div>
 
-          <div style="margin-bottom: 10px">
-            <button
-              id="testCurrentPageBtn"
-              class="btn diag-btn"
-              style="width: 100%"
-            >
+          <div class="tools__item">
+            <button id="testCurrentPageBtn" class="btn tools__btn">
               <i class="fas fa-globe"></i> Test Current Page URL
             </button>
           </div>
 
-          <div class="import-export-controls">
-            <button id="exportRulesBtn" class="btn export-btn">
+          <div class="import-export">
+            <button id="exportRulesBtn" class="btn import-export__btn btn--primary">
               <i class="fas fa-download"></i> Export Rules
             </button>
 
-            <button id="importRulesBtn" class="btn import-btn">
+            <button id="importRulesBtn" class="btn import-export__btn btn--primary">
               <i class="fas fa-upload"></i> Import Rules
             </button>
           </div>
         </div>
 
-        <div id="testTab" class="tab-content">
-          <div style="margin-bottom: 10px">
-            <label>Test URL:</label>
+        <div id="testTab" class="debug__content">
+          <div class="test-url">
+            <label class="test-url__label">Test URL:</label>
             <input
               type="text"
               id="testUrlInput"
+              class="test-url__input"
               placeholder="https://cdn.shopify.com/..."
-              style="width: 100%; margin-bottom: 8px"
             />
-            <button id="testUrlBtn" class="btn diag-btn" style="width: 100%">
+            <button id="testUrlBtn" class="btn test-url__btn btn--primary">
               Test URL
             </button>
           </div>
 
-          <div id="testUrlResult" style="margin-top: 10px; display: none"></div>
+          <div id="testUrlResult" class="test-url__result hidden"></div>
         </div>
       </div>
 
-      <div id="rulesContainer">
+      <div id="rulesContainer" class="rules">
         <!-- Rules will be added here dynamically -->
       </div>
 
-      <button id="addRuleBtn" class="btn add-btn">+ Add New Rule</button>
+      <button id="addRuleBtn" class="add-rule">+ Add New Rule</button>
 
       <!-- Template for rule form -->
       <template id="ruleTemplate">
-        <div class="rule-item">
-          <div class="rule-header">
-            <div class="rule-title-container">
-              <span class="collapse-icon"
-                ><i class="fas fa-chevron-down"></i
-              ></span>
-              <span class="rule-status active"></span>
-              <h3 class="rule-title">Rule</h3>
+        <div class="rule">
+          <div class="rule__header">
+            <div class="rule__title-container">
+              <span class="rule__collapse-icon">
+                <i class="fas fa-chevron-down"></i>
+              </span>
+              <span class="rule__status rule__status--active"></span>
+              <h3 class="rule__title">Rule</h3>
             </div>
-            <div class="rule-actions">
-              <button
-                class="btn toggle-active-btn"
-                title="Toggle Rule Active State"
-              >
+            <div class="rule__actions">
+              <button class="btn rule__toggle-btn" title="Toggle Rule Active State">
                 <i class="fas fa-power-off"></i>
               </button>
-              <button class="btn delete-btn" title="Delete Rule">
+              <button class="btn rule__delete-btn" title="Delete Rule">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
           </div>
 
-          <div class="rule-details">
-            <div class="form-group">
-              <label>From URL:</label>
+          <div class="rule__details">
+            <div class="rule__form-group">
+              <label class="rule__label">From URL:</label>
               <input
                 type="text"
-                class="from-url-input"
+                class="rule__input from-url-input"
                 placeholder="https://cdn.shopify.com/**"
               />
-              <p class="hint">
+              <p class="rule__hint">
                 Use ** as wildcard to capture any part of the URL
               </p>
             </div>
-            <div class="form-group">
-              <label>To URL:</label>
+            <div class="rule__form-group">
+              <label class="rule__label">To URL:</label>
               <input
                 type="text"
-                class="to-url-input"
+                class="rule__input to-url-input"
                 placeholder="http://localhost:3000/**"
               />
-              <p class="hint">
+              <p class="rule__hint">
                 Parts matched by ** will replace ** in To URL. Use http:// for
                 localhost.
               </p>
             </div>
 
             <!-- Advanced options button -->
-            <div class="advanced-toggle">
-              <button class="btn advanced-btn">
+            <div class="advanced__toggle">
+              <button class="btn advanced__btn">
                 <i class="fas fa-cog"></i> Advanced Options
               </button>
             </div>
 
             <!-- Hidden advanced sections -->
-            <div class="advanced-sections" style="display: none">
-              <div class="form-group">
-                <label>Resource Types:</label>
-                <div class="resource-types">
-                  <label
-                    ><input type="checkbox" value="main_frame" checked />
-                    Pages</label
-                  >
-                  <label
-                    ><input type="checkbox" value="stylesheet" checked />
-                    CSS</label
-                  >
-                  <label
-                    ><input type="checkbox" value="script" checked /> JS</label
-                  >
-                  <label
-                    ><input type="checkbox" value="image" checked />
-                    Images</label
-                  >
-                  <label
-                    ><input type="checkbox" value="xmlhttprequest" checked />
-                    XHR</label
-                  >
-                  <label
-                    ><input type="checkbox" value="other" checked />
-                    Other</label
-                  >
+            <div class="advanced__sections" style="display: none;">
+              <div class="rule__form-group">
+                <label class="rule__label">Resource Types:</label>
+                <div class="advanced__resource-types">
+                  <label class="advanced__resource-label">
+                    <input type="checkbox" value="main_frame" checked />
+                    Pages
+                  </label>
+                  <label class="advanced__resource-label">
+                    <input type="checkbox" value="stylesheet" checked />
+                    CSS
+                  </label>
+                  <label class="advanced__resource-label">
+                    <input type="checkbox" value="script" checked /> 
+                    JS
+                  </label>
+                  <label class="advanced__resource-label">
+                    <input type="checkbox" value="image" checked />
+                    Images
+                  </label>
+                  <label class="advanced__resource-label">
+                    <input type="checkbox" value="xmlhttprequest" checked />
+                    XHR
+                  </label>
+                  <label class="advanced__resource-label">
+                    <input type="checkbox" value="other" checked />
+                    Other
+                  </label>
                 </div>
               </div>
-              <div class="rule-test">
-                <h4>Test Redirect</h4>
-                <div class="test-container">
+              <div class="advanced__test">
+                <h4 class="advanced__test-title">Test Redirect</h4>
+                <div class="advanced__test-container">
                   <input
                     type="text"
-                    class="test-input"
+                    class="advanced__test-input test-input"
                     placeholder="Enter full URL to test including https://"
                   />
-                  <button class="btn test-btn">Test</button>
+                  <button class="btn advanced__test-btn btn--primary test-btn">Test</button>
                 </div>
-                <div class="test-result"></div>
+                <div class="advanced__test-result test-result"></div>
               </div>
             </div>
           </div>
