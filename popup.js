@@ -6,6 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
     rulesContainer: document.getElementById("rulesContainer"),
     ruleTemplate: document.getElementById("ruleTemplate"),
     debugBtn: document.getElementById("debugBtn"),
+    donateBtn: document.getElementById("donateBtn"),
+    donateContainer: document.getElementById("donateContainer"),
+    backToRulesBtn: document.getElementById("backToRulesBtn"),
     debugPanel: document.getElementById("debugPanel"),
     debugToPageToggle: document.getElementById("debugToPageToggle"),
     clearHistoryBtn: document.getElementById("clearHistoryBtn"),
@@ -186,16 +189,21 @@ class RuleManager {
   }
 
   /**
-   * Get all unique sections
+   * Get all section names
    * @returns {Array} Array of section names
    */
   getSections() {
-    const sectionSet = new Set();
+    // Get all sections defined in this.sections
+    const definedSections = Object.keys(this.sections);
+    
+    // Get all sections used in rules
+    const sectionSet = new Set(definedSections);
     this.rules.forEach(rule => {
       if (rule.section) {
         sectionSet.add(rule.section);
       }
     });
+    
     return Array.from(sectionSet);
   }
   
@@ -351,6 +359,12 @@ class PopupUI {
     this.elements.enableToggle.addEventListener("change", () => this.toggleRedirect());
     this.elements.addSectionBtn.addEventListener("click", () => this.addNewSection());
     this.elements.debugBtn.addEventListener("click", () => this.toggleDebugPanel());
+    this.elements.donateBtn.addEventListener("click", () => {
+      // Check if donate container is currently visible
+      const isDonateVisible = !this.elements.donateContainer.classList.contains("hidden");
+      this.toggleDonateView(!isDonateVisible);
+    });
+    this.elements.backToRulesBtn.addEventListener("click", () => this.toggleDonateView(false));
 
     // Debug panel event listeners
     this.elements.clearHistoryBtn.addEventListener("click", () => this.clearRedirectHistory());
@@ -1454,6 +1468,49 @@ class PopupUI {
         ruleTitle.textContent = originalText;
       }
     });
+  }
+
+  /**
+   * Toggle donate view visibility
+   */
+  toggleDonateView(isVisible) {
+    console.log("toggleDonateView called with isVisible:", isVisible);
+    console.log("addSectionBtn before:", this.elements.addSectionBtn.classList.contains("hidden") ? "hidden" : "visible");
+    
+    if (isVisible) {
+      // Show donate view, hide rules
+      this.elements.donateContainer.classList.remove("hidden");
+      this.elements.rulesContainer.classList.add("hidden");
+      this.elements.addSectionBtn.classList.add("hidden");
+    } else {
+      // Hide donate view, show rules
+      this.elements.donateContainer.classList.add("hidden");
+      this.elements.rulesContainer.classList.remove("hidden");
+      this.elements.addSectionBtn.classList.remove("hidden");
+    }
+    
+    console.log("addSectionBtn after:", this.elements.addSectionBtn.classList.contains("hidden") ? "hidden" : "visible");
+    
+    // Add click handler for the entire donate container to go back
+    if (isVisible) {
+      const donateContainer = this.elements.donateContainer;
+      
+      // Use event delegation to handle clicks on the container
+      const handleContainerClick = (event) => {
+        // Don't trigger when clicking on the image or the title
+        if (event.target.closest('.donate-image') || 
+            event.target.closest('.donate-title') ||
+            event.target.closest('.back-btn')) {
+          return;
+        }
+        
+        // Toggle back to rules view
+        this.toggleDonateView(false);
+        donateContainer.removeEventListener('click', handleContainerClick);
+      };
+      
+      donateContainer.addEventListener('click', handleContainerClick);
+    }
   }
 }
 

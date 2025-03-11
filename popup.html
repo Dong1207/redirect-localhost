@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Localhost Redirect</title>
+    <title>Avada Override</title>
     <link rel="stylesheet" type="text/css" href="popup.css" />
     <link
       rel="stylesheet"
@@ -10,7 +10,7 @@
   </head>
   <body>
     <div class="container">
-      <h1 class="header">Localhost Redirect</h1>
+      <h1 class="header">Avada Override</h1>
 
       <div class="toggle">
         <label class="toggle__switch switch">
@@ -22,6 +22,9 @@
         <div class="controls">
           <button id="debugBtn" class="btn controls__btn">
             <i class="fas fa-bug"></i> Debug
+          </button>
+          <button id="donateBtn" class="btn controls__btn">
+            <i class="fas fa-donate"></i> Donate
           </button>
         </div>
       </div>
@@ -73,6 +76,19 @@
       </div>
 
       <button id="addSectionBtn" class="add-section">+ Add New Section</button>
+      
+      <!-- Donate Container (initially hidden) -->
+      <div id="donateContainer" class="donate-container hidden">
+        <div class="donate-header">
+          <h2 class="donate-title">Support This Project</h2>
+          <button id="backToRulesBtn" class="btn back-btn">
+            <i class="fas fa-arrow-left"></i> Back
+          </button>
+        </div>
+        <div class="donate-body">
+          <img src="./images/stk.jpg" alt="Donation QR Code" class="donate-image">
+        </div>
+      </div>
 
       <!-- Template for rule form -->
       <template id="ruleTemplate">
