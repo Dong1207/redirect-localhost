@@ -842,12 +842,19 @@ class PopupUI {
         const fromUrl = this.truncateUrl(item.fromUrl, 60);
         const toUrl = this.truncateUrl(item.toUrl, 60);
         const date = new Date(item.timestamp);
-        const timeString = date.toLocaleTimeString();
+        const dateTimeString = date.toLocaleString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
 
         historyItem.innerHTML = `
-          <div class="history__from">${fromUrl}</div>
-          <div class="history__to">${toUrl}</div>
-          <div class="history__time">${timeString}</div>
+          <div class="history__from"><strong>From:</strong> ${fromUrl}</div>
+          <div class="history__to"><strong>To:</strong> ${toUrl}</div>
+          <div class="history__time"><strong>Time:</strong> ${dateTimeString}</div>
         `;
 
         this.elements.redirectHistory.appendChild(historyItem);
