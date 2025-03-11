@@ -201,27 +201,34 @@ document.addEventListener("DOMContentLoaded", () => {
         "xmlhttprequest",
         "other",
       ],
-      disabled: false,
+      disabled: false
     };
 
     // Add the new rule to the array
     redirectRules.push(newRule);
-
+    
     // Save to storage immediately
     saveRules();
-
+    
     // Create and add the rule element to the DOM
     const index = redirectRules.length - 1;
     const ruleElement = initializeRuleElement(newRule, index);
     elements.rulesContainer.appendChild(ruleElement);
-
-    // Focus on the From URL input field
+    
+    // Expand the newly added rule to allow immediate editing
     setTimeout(() => {
+      ruleElement.classList.remove("rule--collapsed");
+      const icon = ruleElement.querySelector(".rule__collapse-icon i");
+      if (icon) {
+        icon.className = "fas fa-chevron-down";
+      }
+      
+      // Focus on the From URL input field
       const fromUrlInput = ruleElement.querySelector(".from-url-input");
       if (fromUrlInput) {
         fromUrlInput.focus();
       }
-    }, 100);
+    }, 50);
   }
 
   function updateRule(index) {
@@ -272,16 +279,47 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function testRedirect(inputUrl, rule) {
-    if (!rule.fromUrl || !rule.toUrl) return Promise.resolve(null);
+    if (!rule.fromUrl || !rule.toUrl) {
+      return { matches: false };
+    }
 
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        {action: "testUrlMatch", inputUrl, rule},
-        (response) => {
-          resolve(response?.matched ? response.redirectUrl : null);
+    // Simple pattern matching for immediate feedback
+    const fromPattern = rule.fromUrl;
+    const toPattern = rule.toUrl;
+    
+    // Check for wildcard pattern
+    if (fromPattern.includes("**")) {
+      const parts = fromPattern.split("**");
+      const prefix = parts[0];
+      const suffix = parts[1] || "";
+      
+      if (inputUrl.startsWith(prefix) && inputUrl.endsWith(suffix)) {
+        // Extract the wildcard content
+        const wildcardStart = prefix.length;
+        const wildcardEnd = inputUrl.length - suffix.length;
+        const wildcardContent = inputUrl.substring(wildcardStart, wildcardEnd);
+        
+        // Replace the wildcard in the target pattern
+        let redirectUrl = toPattern;
+        if (toPattern.includes("**")) {
+          redirectUrl = toPattern.replace("**", wildcardContent);
         }
-      );
-    });
+        
+        return {
+          matches: true,
+          redirectUrl: redirectUrl,
+          wildcardContent: wildcardContent
+        };
+      }
+    } else if (inputUrl === fromPattern) {
+      // Direct match
+      return {
+        matches: true,
+        redirectUrl: toPattern
+      };
+    }
+    
+    return { matches: false };
   }
 
   function truncateUrl(url, maxLength) {
@@ -324,18 +362,18 @@ document.addEventListener("DOMContentLoaded", () => {
   function createRuleElement(rule = {}, index) {
     const clone = document.importNode(elements.ruleTemplate.content, true);
     const ruleElement = clone.querySelector(".rule");
-
+    
     ruleElement.setAttribute("data-index", index);
     if (rule.disabled) {
       ruleElement.setAttribute("data-disabled", "true");
     }
-
+    
     return ruleElement;
   }
 
   function initializeRuleElement(rule, index) {
     const ruleElement = createRuleElement(rule, index);
-
+    
     // Get form elements
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
@@ -344,60 +382,71 @@ document.addEventListener("DOMContentLoaded", () => {
     const toggleActiveBtn = ruleElement.querySelector(".rule__toggle-btn");
     const deleteBtn = ruleElement.querySelector(".rule__delete-btn");
     const header = ruleElement.querySelector(".rule__header");
-
+    
+    // Ensure the rule is collapsed by default
+    ruleElement.classList.add("rule--collapsed");
+    const collapseIcon = ruleElement.querySelector(".rule__collapse-icon i");
+    collapseIcon.className = "fas fa-chevron-right";
+    
     // Set initial values - ensure we're using the correct property names
     fromUrlInput.value = rule.fromUrl || "";
     toUrlInput.value = rule.toUrl || "";
-
+    
     // Set up resource type checkboxes
     if (rule.resourceTypes && rule.resourceTypes.length > 0) {
-      const checkboxes = ruleElement.querySelectorAll(
-        ".advanced__resource-types input"
-      );
+      const checkboxes = ruleElement.querySelectorAll(".advanced__resource-types input");
       checkboxes.forEach((checkbox) => {
         checkbox.checked = rule.resourceTypes.includes(checkbox.value);
       });
     }
-
-    // Set up event listeners
-    header.addEventListener("click", (e) => {
-      if (!e.target.closest(".rule__actions")) {
-        ruleElement.classList.toggle("rule--collapsed");
-      }
+    
+    // Set up event listeners for the header (collapse/expand)
+    const titleContainer = header.querySelector(".rule__title-container");
+    titleContainer.addEventListener("click", () => {
+      ruleElement.classList.toggle("rule--collapsed");
+      const icon = header.querySelector(".rule__collapse-icon i");
+      icon.className = ruleElement.classList.contains("rule--collapsed")
+        ? "fas fa-chevron-right"
+        : "fas fa-chevron-down";
     });
-
-    deleteBtn.addEventListener("click", () => deleteRule(index));
-
-    toggleActiveBtn.addEventListener("click", () => {
-      rule.disabled = !rule.disabled;
-      updateRuleStatus(ruleElement, rule, elements.enableToggle.checked);
+    
+    // Set up event listeners for action buttons with stopPropagation
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent event from bubbling up to header
+      deleteRule(index);
+    });
+    
+    toggleActiveBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent event from bubbling up to header
+      redirectRules[index].disabled = !redirectRules[index].disabled;
+      updateRuleStatus(ruleElement, redirectRules[index], elements.enableToggle.checked);
       saveRules();
     });
-
-    advancedBtn.addEventListener("click", () => {
-      advancedSections.style.display =
-        advancedSections.style.display === "none" ||
-        !advancedSections.style.display
-          ? "block"
+    
+    advancedBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent event from bubbling up
+      advancedSections.style.display = 
+        advancedSections.style.display === "none" || !advancedSections.style.display 
+          ? "block" 
           : "none";
     });
-
+    
     // Set up test functionality
     setupTestFunctionality(ruleElement, rule);
-
+    
     // Attach input event listeners
     attachRuleEventListeners(ruleElement, rule, index, {
       fromUrlInput,
       toUrlInput,
       advancedBtn,
       advancedSections,
-      toggleActiveBtn,
+      toggleActiveBtn
     });
-
+    
     // Update rule title and status
     updateRuleTitle(ruleElement, rule);
     updateRuleStatus(ruleElement, rule, elements.enableToggle.checked);
-
+    
     return ruleElement;
   }
 
@@ -407,17 +456,6 @@ document.addEventListener("DOMContentLoaded", () => {
     index,
     {fromUrlInput, toUrlInput, advancedBtn, advancedSections, toggleActiveBtn}
   ) {
-    // Advanced options toggle
-    advancedBtn.addEventListener("click", () => {
-      const isHidden =
-        advancedSections.style.display === "none" ||
-        !advancedSections.style.display;
-      advancedSections.style.display = isHidden ? "block" : "none";
-      advancedBtn.innerHTML = isHidden
-        ? '<i class="fas fa-cog"></i> Hide Advanced Options'
-        : '<i class="fas fa-cog"></i> Advanced Options';
-    });
-
     // Input change handlers
     const updateHandler = () => {
       updateRule(index);
@@ -435,7 +473,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fromUrlInput.addEventListener("input", updateHandler);
     fromUrlInput.addEventListener("change", updateHandler);
     fromUrlInput.addEventListener("blur", updateHandler);
-
+    
     toUrlInput.addEventListener("input", updateHandler);
     toUrlInput.addEventListener("change", updateHandler);
     toUrlInput.addEventListener("blur", updateHandler);
@@ -446,48 +484,8 @@ document.addEventListener("DOMContentLoaded", () => {
         checkbox.addEventListener("change", () => updateRule(index));
       });
 
-    // Toggle active button
-    toggleActiveBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const isCurrentlyDisabled = rule.disabled === true;
-      rule.disabled = !isCurrentlyDisabled;
-
-      // Don't set the disabled attribute on the rule element
-      // element.dataset.disabled = (!isCurrentlyDisabled).toString();
-
-      // Update status indicator immediately when toggle button is clicked
-      chrome.storage.local.get(["enabled"], (result) => {
-        updateRuleStatus(element, rule, result.enabled === true);
-      });
-
-      updateRule(index);
-    });
-
-    // Delete button
-    element
-      .querySelector(".rule__delete-btn")
-      .addEventListener("click", (e) => {
-        e.stopPropagation();
-        deleteRule(index);
-      });
-
-    // Collapse functionality
-    const ruleHeader = element.querySelector(".rule__header");
-    ruleHeader.addEventListener("click", () => {
-      element.classList.toggle("rule--collapsed");
-      const icon = ruleHeader.querySelector(".collapse-icon i");
-      icon.className = element.classList.contains("rule--collapsed")
-        ? "fas fa-chevron-right"
-        : "fas fa-chevron-down";
-    });
-
-    // Test functionality
-    setupTestFunctionality(element, rule);
-
-    // Set initial status for both indicator and toggle button
-    chrome.storage.local.get(["enabled"], (result) => {
-      updateRuleStatus(element, rule, result.enabled === true);
-    });
+    // Note: The toggle active button, delete button, and collapse functionality
+    // event listeners are now set up in the initializeRuleElement function
   }
 
   function updateRuleTitle(ruleElement, rule) {
@@ -506,7 +504,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const testBtn = element.querySelector(".advanced__test-btn");
     const testResult = element.querySelector(".advanced__test-result");
 
-    testBtn.addEventListener("click", () => {
+    testBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent event from bubbling up
+      
       const inputUrl = testInput.value.trim();
       if (!inputUrl) {
         testResult.textContent = "Please enter a URL to test";
@@ -515,15 +515,33 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const result = testRedirect(inputUrl, rule);
-      if (result.matches) {
-        testResult.innerHTML = `✅ Match! Will redirect to:<br>${result.redirectUrl}`;
-        testResult.className = "advanced__test-result test-result success";
-      } else {
-        testResult.textContent = "❌ No match. This URL won't be redirected.";
-        testResult.className = "advanced__test-result test-result error";
-      }
-      testResult.style.display = "block";
+      // Get the current rule data from the form
+      const ruleIndex = element.getAttribute("data-index");
+      const currentRule = redirectRules[ruleIndex];
+      
+      // Test with the current rule data
+      chrome.runtime.sendMessage(
+        {
+          action: "testUrlMatch",
+          inputUrl: inputUrl,
+          rule: currentRule
+        },
+        (response) => {
+          if (response && response.matched) {
+            testResult.innerHTML = `✅ Match! Will redirect to:<br>${response.redirectUrl}`;
+            testResult.className = "advanced__test-result test-result success";
+          } else {
+            testResult.textContent = "❌ No match. This URL won't be redirected.";
+            testResult.className = "advanced__test-result test-result error";
+          }
+          testResult.style.display = "block";
+        }
+      );
+    });
+    
+    // Prevent input field clicks from collapsing the rule
+    testInput.addEventListener("click", (e) => {
+      e.stopPropagation();
     });
   }
 
