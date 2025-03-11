@@ -294,6 +294,20 @@ body {
     font-size: 14px;
     font-weight: 600;
     color: #333;
+    transition: background-color 0.2s;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.rule__title:hover {
+    background-color: rgba(33, 150, 243, 0.1);
+}
+
+.rule__title[contenteditable="true"] {
+    background-color: #fff;
+    border: 1px solid #2196F3;
+    outline: none;
+    min-width: 100px;
 }
 
 .rule__actions {
@@ -627,9 +641,27 @@ input:checked+.slider:before {
     transition: all 0.3s ease;
 }
 
+/* Section when collapsed */
+.section--collapsed .section__rules {
+    display: none;
+}
+
+/* Section when disabled */
 .section[data-disabled="true"] {
     opacity: 0.7;
     background-color: #f0f0f0;
+}
+
+/* Section collapse icon */
+.section__collapse-icon {
+    margin-right: 8px;
+    font-size: 12px;
+    color: #555;
+    transition: transform 0.3s;
+}
+
+.section--collapsed .section__collapse-icon i {
+    transform: rotate(-90deg);
 }
 
 /* Section header */
@@ -673,6 +705,20 @@ input:checked+.slider:before {
     font-size: 14px;
     font-weight: 600;
     color: #333;
+    transition: background-color 0.2s;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.section__title:hover {
+    background-color: rgba(33, 150, 243, 0.1);
+}
+
+.section__title[contenteditable="true"] {
+    background-color: #fff;
+    border: 1px solid #2196F3;
+    outline: none;
+    min-width: 100px;
 }
 
 /* Section actions */
@@ -789,6 +835,21 @@ input:checked+.slider:before {
 .section__add-rule {
     margin: 0 10px 10px 10px;
     width: calc(100% - 20px);
+}
+
+/* Section add rule button in actions */
+.section__add-rule-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 14px;
+    border-radius: 3px;
+}
+
+.section__add-rule-btn:hover {
+    background-color: #3e8e41;
 }
 
 /* Section edit button */

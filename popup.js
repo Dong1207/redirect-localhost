@@ -504,9 +504,6 @@ class PopupUI {
     // Get form elements
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
-    const advancedToggle = ruleElement.querySelector(".advanced__toggle");
-    const advancedBtn = advancedToggle.querySelector(".advanced__btn");
-    const advancedSections = ruleElement.querySelector(".advanced__sections");
     const toggleActiveBtn = ruleElement.querySelector(".rule__toggle-btn");
     const deleteBtn = ruleElement.querySelector(".rule__delete-btn");
     const header = ruleElement.querySelector(".rule__header");
@@ -516,6 +513,17 @@ class PopupUI {
     const collapseIcon = ruleElement.querySelector(".rule__collapse-icon i");
     collapseIcon.className = "fas fa-chevron-right";
 
+    // Add double-click event to make rule title editable
+    const ruleTitle = ruleElement.querySelector(".rule__title");
+    ruleTitle.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      this.makeRuleTitleEditable(ruleTitle, rule, index);
+    });
+    
+    // Add CSS to indicate it's editable
+    ruleTitle.style.cursor = 'pointer';
+    ruleTitle.title = 'Double-click to edit';
+
     // Set initial values
     fromUrlInput.value = rule.fromUrl || "";
     toUrlInput.value = rule.toUrl || "";
@@ -524,19 +532,7 @@ class PopupUI {
     fromUrlInput.addEventListener("input", () => this.updateRuleFromForm(index, ruleElement));
     toUrlInput.addEventListener("input", () => this.updateRuleFromForm(index, ruleElement));
 
-    // Create advanced options section
-    this.setupAdvancedOptions(ruleElement, rule, index);
-
-    // Set up event listeners for the header (collapse/expand)
-    const titleContainer = header.querySelector(".rule__title-container");
-    titleContainer.addEventListener("click", () => {
-      ruleElement.classList.toggle("rule--collapsed");
-      collapseIcon.className = ruleElement.classList.contains("rule--collapsed")
-        ? "fas fa-chevron-right"
-        : "fas fa-chevron-down";
-    });
-
-    // Set up event listeners for the toggle and delete buttons
+    // Set up toggle and delete buttons
     toggleActiveBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       this.toggleRuleActive(index);
@@ -547,45 +543,21 @@ class PopupUI {
       this.deleteRule(index);
     });
 
-    // Update the rule title
+    // Toggle collapse on header click
+    header.addEventListener("click", () => {
+      ruleElement.classList.toggle("rule--collapsed");
+      collapseIcon.className = ruleElement.classList.contains("rule--collapsed")
+        ? "fas fa-chevron-right"
+        : "fas fa-chevron-down";
+    });
+
+    // Update rule status
+    this.updateRuleStatus(ruleElement, rule, !rule.disabled);
+    
+    // Update rule title
     this.updateRuleTitle(ruleElement, rule);
 
     return ruleElement;
-  }
-
-  /**
-   * Set up advanced options for a rule
-   */
-  setupAdvancedOptions(ruleElement, rule, index) {
-    const advancedToggle = ruleElement.querySelector(".advanced__toggle");
-    const advancedBtn = advancedToggle.querySelector(".advanced__btn");
-    const advancedSections = ruleElement.querySelector(".advanced__sections");
-
-    // Toggle advanced options visibility
-    advancedBtn.addEventListener("click", () => {
-      const isVisible = advancedSections.style.display !== "none";
-      advancedSections.style.display = isVisible ? "none" : "block";
-    });
-
-    // Set up name input
-    const nameInput = document.createElement("div");
-    nameInput.className = "rule__form-group";
-    nameInput.innerHTML = `
-      <label class="rule__label">Rule Name:</label>
-      <input type="text" class="rule__input name-input" placeholder="Optional rule name" value="${
-        rule.name || ""
-      }" />
-      <p class="rule__hint">
-        Give your rule a descriptive name to help identify it.
-      </p>
-    `;
-    advancedSections.appendChild(nameInput);
-
-    // Add event listeners for name input
-    const nameInputElement = nameInput.querySelector(".name-input");
-    nameInputElement.addEventListener("input", () => {
-      this.updateRuleFromForm(index, ruleElement);
-    });
   }
 
   /**
@@ -594,12 +566,10 @@ class PopupUI {
   async updateRuleFromForm(index, ruleElement) {
     const fromUrlInput = ruleElement.querySelector(".from-url-input");
     const toUrlInput = ruleElement.querySelector(".to-url-input");
-    const nameInput = ruleElement.querySelector(".name-input");
 
     const data = {
       fromUrl: fromUrlInput.value,
       toUrl: toUrlInput.value,
-      name: nameInput ? nameInput.value : "",
     };
 
     this.ruleManager.updateRule(index, data);
@@ -991,6 +961,11 @@ class PopupUI {
     const titleContainer = document.createElement('div');
     titleContainer.className = 'section__title-container';
     
+    // Add collapse icon
+    const collapseIcon = document.createElement('span');
+    collapseIcon.className = 'section__collapse-icon';
+    collapseIcon.innerHTML = '<i class="fas fa-chevron-down"></i>';
+    
     const statusIndicator = document.createElement('span');
     statusIndicator.className = `section__status ${isEnabled ? 'section__status--active' : 'section__status--inactive'}`;
     
@@ -998,8 +973,28 @@ class PopupUI {
     title.className = 'section__title';
     title.textContent = sectionName;
     
+    // Add double-click event to make title editable
+    title.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      this.makeElementEditable(title, sectionName);
+    });
+    
+    // Add CSS to indicate it's editable
+    title.style.cursor = 'pointer';
+    title.title = 'Double-click to edit';
+    
     const actions = document.createElement('div');
     actions.className = 'section__actions';
+    
+    // Create Add Rule button
+    const addRuleBtn = document.createElement('button');
+    addRuleBtn.className = 'btn section__add-rule-btn';
+    addRuleBtn.title = 'Add New Rule';
+    addRuleBtn.innerHTML = '<i class="fas fa-plus"></i>';
+    addRuleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.addNewRuleToSection(sectionName);
+    });
     
     const toggleBtn = document.createElement('button');
     toggleBtn.className = `btn section__toggle-btn ${!isEnabled ? 'section__toggle-btn--inactive' : ''}`;
@@ -1035,9 +1030,11 @@ class PopupUI {
     });
     
     // Assemble the section element
+    titleContainer.appendChild(collapseIcon);
     titleContainer.appendChild(statusIndicator);
     titleContainer.appendChild(title);
     
+    actions.appendChild(addRuleBtn);
     actions.appendChild(toggleBtn);
     actions.appendChild(editBtn);
     actions.appendChild(deleteBtn);
@@ -1045,19 +1042,34 @@ class PopupUI {
     header.appendChild(titleContainer);
     header.appendChild(actions);
     
+    // Add click event to header for collapsing/expanding
+    header.addEventListener('click', () => {
+      sectionElement.classList.toggle('section--collapsed');
+      const icon = collapseIcon.querySelector('i');
+      if (sectionElement.classList.contains('section--collapsed')) {
+        icon.className = 'fas fa-chevron-right';
+      } else {
+        icon.className = 'fas fa-chevron-down';
+      }
+      
+      // Save collapse state to localStorage
+      const isCollapsed = sectionElement.classList.contains('section--collapsed');
+      localStorage.setItem(`section_${sectionName}_collapsed`, isCollapsed);
+    });
+    
+    // Check if section was previously collapsed
+    const wasCollapsed = localStorage.getItem(`section_${sectionName}_collapsed`) === 'true';
+    if (wasCollapsed) {
+      sectionElement.classList.add('section--collapsed');
+      collapseIcon.querySelector('i').className = 'fas fa-chevron-right';
+    }
+    
     sectionElement.appendChild(header);
     
     // Create a container for rules in this section
     const rulesContainer = document.createElement('div');
     rulesContainer.className = 'section__rules';
     sectionElement.appendChild(rulesContainer);
-    
-    // Add the "Add Rule" button for this section
-    const addRuleBtn = document.createElement('button');
-    addRuleBtn.className = 'add-rule section__add-rule';
-    addRuleBtn.textContent = '+ Add Rule';
-    addRuleBtn.addEventListener('click', () => this.addNewRuleToSection(sectionName));
-    sectionElement.appendChild(addRuleBtn);
     
     // Display rules for this section
     this.displayRulesForSection(sectionName, rulesContainer);
@@ -1106,7 +1118,7 @@ class PopupUI {
   }
 
   /**
-   * Add a new section
+   * Add a new section with a default rule
    */
   async addNewSection() {
     // Create a default section name
@@ -1122,14 +1134,28 @@ class PopupUI {
     
     // Create the section
     this.ruleManager.setSectionEnabled(sectionName, true);
+    
+    // Add a default rule to the section
+    const newRuleIndex = this.ruleManager.addRule();
+    this.ruleManager.rules[newRuleIndex].section = sectionName;
+    this.ruleManager.rules[newRuleIndex].name = "Default Rule";
+    
+    // Save changes
     await this.ruleManager.saveRules();
     
     // Update the UI
     this.displaySections();
     
-    // Automatically prompt to edit the section name
+    // Find the newly created section element and make the title editable
     setTimeout(() => {
-      this.editSectionName(sectionName);
+      const sectionElements = document.querySelectorAll('.section');
+      for (const element of sectionElements) {
+        if (element.getAttribute('data-section') === sectionName) {
+          const titleElement = element.querySelector('.section__title');
+          this.makeElementEditable(titleElement, sectionName);
+          break;
+        }
+      }
     }, 100);
   }
 
@@ -1217,32 +1243,143 @@ class PopupUI {
    * Edit section name
    */
   async editSectionName(sectionName) {
-    // Prompt for new section name
-    const newName = prompt("Enter a new name for the section:");
-    
-    if (!newName || newName.trim() === "") {
-      return;
+    // Find the section element
+    const sectionElements = document.querySelectorAll('.section');
+    for (const element of sectionElements) {
+      if (element.getAttribute('data-section') === sectionName) {
+        const titleElement = element.querySelector('.section__title');
+        this.makeElementEditable(titleElement, sectionName);
+        break;
+      }
     }
+  }
+
+  /**
+   * Make an element editable inline
+   * @param {HTMLElement} element - The element to make editable
+   * @param {string} sectionName - The current section name
+   */
+  makeElementEditable(element, sectionName) {
+    // Store the original text
+    const originalText = element.textContent;
     
-    // Check if section already exists
-    const existingSections = this.ruleManager.getSections();
-    if (existingSections.includes(newName)) {
-      alert(`Section "${newName}" already exists.`);
-      return;
-    }
+    // Make the element editable
+    element.contentEditable = true;
+    element.focus();
     
-    // Update section name
-    this.ruleManager.rules.forEach(rule => {
-      if (rule.section === sectionName) {
-        rule.section = newName;
+    // Select all text
+    document.execCommand('selectAll', false, null);
+    
+    // Add event listeners for saving changes
+    const saveChanges = async () => {
+      element.contentEditable = false;
+      const newName = element.textContent.trim();
+      
+      // If empty, revert to original
+      if (!newName) {
+        element.textContent = originalText;
+        return;
+      }
+      
+      // If unchanged, do nothing
+      if (newName === sectionName) {
+        return;
+      }
+      
+      // Check if section already exists
+      const existingSections = this.ruleManager.getSections();
+      if (existingSections.includes(newName)) {
+        alert(`Section "${newName}" already exists.`);
+        element.textContent = originalText;
+        return;
+      }
+      
+      // Update section name
+      this.ruleManager.rules.forEach(rule => {
+        if (rule.section === sectionName) {
+          rule.section = newName;
+        }
+      });
+      
+      // Save changes
+      await this.ruleManager.saveRules();
+      
+      // Update UI
+      this.displaySections();
+    };
+    
+    // Save on blur
+    element.addEventListener('blur', saveChanges, { once: true });
+    
+    // Save on Enter key
+    element.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await saveChanges();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        element.contentEditable = false;
+        element.textContent = originalText;
       }
     });
+  }
+
+  /**
+   * Make a rule title editable
+   */
+  makeRuleTitleEditable(ruleTitle, rule, index) {
+    // Store the original text and rule name
+    const originalText = ruleTitle.textContent;
+    const originalName = rule.name || "";
     
-    // Save changes
-    await this.ruleManager.saveRules();
+    // Make the rule title editable
+    ruleTitle.contentEditable = true;
+    ruleTitle.focus();
     
-    // Update UI
-    this.displaySections();
+    // Select all text
+    document.execCommand('selectAll', false, null);
+    
+    // Add event listeners for saving changes
+    const saveChanges = async () => {
+      ruleTitle.contentEditable = false;
+      const newName = ruleTitle.textContent.trim();
+      
+      // If empty, revert to original display
+      if (!newName) {
+        rule.name = "";
+        this.updateRuleTitle(ruleTitle.closest('.rule'), rule);
+        return;
+      }
+      
+      // If unchanged, do nothing
+      if (newName === originalName) {
+        return;
+      }
+      
+      // Update rule name
+      rule.name = newName;
+      
+      // Save changes
+      await this.ruleManager.saveRules();
+      
+      // Update UI
+      this.updateRuleTitle(ruleTitle.closest('.rule'), rule);
+    };
+    
+    // Save on blur
+    ruleTitle.addEventListener('blur', saveChanges, { once: true });
+    
+    // Save on Enter key
+    ruleTitle.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await saveChanges();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        ruleTitle.contentEditable = false;
+        ruleTitle.textContent = originalText;
+      }
+    });
   }
 }
 
