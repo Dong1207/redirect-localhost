@@ -202,39 +202,6 @@ body {
     font-size: 12px;
 }
 
-/* Test URL section */
-.test-url {
-    margin-bottom: 8px;
-}
-
-.test-url__label {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 12px;
-}
-
-.test-url__input {
-    width: 100%;
-    padding: 6px;
-    margin-bottom: 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-sizing: border-box;
-    font-size: 12px;
-}
-
-.test-url__btn {
-    width: 100%;
-}
-
-.test-url__result {
-    margin-top: 8px;
-    padding: 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    display: none;
-}
-
 /* Rules container */
 .rules {
     margin-bottom: 12px;
@@ -482,79 +449,6 @@ body {
     font-size: 11px;
     color: #777;
     margin-top: 2px;
-}
-
-/* Resource Types Section */
-.resource-types__grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin-top: 6px;
-}
-
-.resource-types__option {
-    display: flex;
-    align-items: center;
-    font-size: 12px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.resource-types__option input[type="checkbox"] {
-    margin-right: 4px;
-}
-
-/* Test Section */
-.test-section__content {
-    margin-top: 6px;
-}
-
-.test-section__input-group {
-    display: flex;
-    gap: 6px;
-}
-
-.test-section__input {
-    flex: 1;
-    padding: 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 12px;
-}
-
-.test-section__btn {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.test-section__btn:hover {
-    background-color: #45a049;
-}
-
-.test-section__result {
-    margin-top: 8px;
-    padding: 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    display: none;
-}
-
-.test-section__result.success {
-    background-color: #e8f5e9;
-    color: #2e7d32;
-    border: 1px solid #c8e6c9;
-}
-
-.test-section__result.error {
-    background-color: #ffebee;
-    color: #c62828;
-    border: 1px solid #ffcdd2;
 }
 
 /* Utility classes */

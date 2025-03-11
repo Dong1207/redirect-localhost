@@ -371,10 +371,8 @@ class PopupUI {
     // Debug panel event listeners
     this.elements.clearHistoryBtn.addEventListener("click", () => this.clearRedirectHistory());
     this.elements.checkRulesBtn.addEventListener("click", () => this.checkActiveRules());
-    this.elements.testCurrentPageBtn.addEventListener("click", () => this.testCurrentPageUrl());
     this.elements.exportRulesBtn.addEventListener("click", () => this.exportRules());
     this.elements.importRulesBtn.addEventListener("click", () => this.importRules());
-    this.elements.testUrlBtn.addEventListener("click", () => this.testUrl());
     
     // Debug toggle setup
     chrome.storage.local.get(["debugToPage"], (result) => {
@@ -667,102 +665,6 @@ class PopupUI {
     sectionInputElement.addEventListener("input", () => {
       this.updateRuleFromForm(index, ruleElement);
     });
-
-    // Set up resource types
-    this.createResourceTypesSection(rule, advancedSections);
-
-    // Set up test section
-    this.createTestSection(ruleElement, rule, advancedSections);
-  }
-
-  /**
-   * Create the resource types section for advanced options
-   */
-  createResourceTypesSection(rule, advancedSections) {
-    const resourceTypesSection = document.createElement("div");
-    resourceTypesSection.className = "advanced-section resource-types";
-
-    // Create the resource types header
-    const resourceTypesHeader = document.createElement("div");
-    resourceTypesHeader.className = "advanced-section__header";
-    resourceTypesHeader.textContent = "Resource Types";
-    resourceTypesSection.appendChild(resourceTypesHeader);
-
-    // Create the resource types grid
-    const resourceTypesGrid = document.createElement("div");
-    resourceTypesGrid.className = "resource-types__grid";
-
-    // Define all possible resource types
-    const allResourceTypes = [
-      { value: "main_frame", label: "Pages" },
-      { value: "stylesheet", label: "CSS" },
-      { value: "script", label: "JS" },
-      { value: "image", label: "Images" },
-      { value: "xmlhttprequest", label: "XHR" },
-      { value: "other", label: "Other" }
-    ];
-
-    // Add checkboxes for each resource type
-    allResourceTypes.forEach(type => {
-      const isChecked = rule.resourceTypes && rule.resourceTypes.includes(type.value);
-
-      const checkbox = document.createElement("label");
-      checkbox.className = "resource-types__option";
-      checkbox.innerHTML = `
-        <input type="checkbox" value="${type.value}" ${isChecked ? 'checked' : ''}>
-        <span>${type.label}</span>
-      `;
-      resourceTypesGrid.appendChild(checkbox);
-    });
-
-    resourceTypesSection.appendChild(resourceTypesGrid);
-    advancedSections.appendChild(resourceTypesSection);
-  }
-
-  /**
-   * Create the test section for advanced options
-   */
-  createTestSection(ruleElement, rule, advancedSections) {
-    const testSection = document.createElement("div");
-    testSection.className = "advanced-section test-section";
-
-    const testHeader = document.createElement("div");
-    testHeader.className = "advanced-section__header";
-    testHeader.textContent = "Test Redirect";
-    testSection.appendChild(testHeader);
-
-    const testContent = document.createElement("div");
-    testContent.className = "test-section__content";
-
-    const testInputGroup = document.createElement("div");
-    testInputGroup.className = "test-section__input-group";
-
-    const testInput = document.createElement("input");
-    testInput.type = "text";
-    testInput.className = "test-section__input";
-    testInput.placeholder = "Enter full URL to test including https://";
-
-    const testBtn = document.createElement("button");
-    testBtn.className = "test-section__btn";
-    testBtn.textContent = "Test";
-
-    testInputGroup.appendChild(testInput);
-    testInputGroup.appendChild(testBtn);
-
-    const testResult = document.createElement("div");
-    testResult.className = "test-section__result";
-    testResult.style.display = "none";
-
-    testContent.appendChild(testInputGroup);
-    testContent.appendChild(testResult);
-    testSection.appendChild(testContent);
-
-    advancedSections.appendChild(testSection);
-
-    // Set up test functionality
-    const testInputElement = testInputGroup.querySelector(".test-section__input");
-    const testBtnElement = testInputGroup.querySelector(".test-section__btn");
-    this.setupTestFunctionality(ruleElement, rule, testInputElement, testBtnElement, testResult);
   }
 
   /**
@@ -773,20 +675,12 @@ class PopupUI {
     const toUrlInput = ruleElement.querySelector(".to-url-input");
     const nameInput = ruleElement.querySelector(".name-input");
     const sectionInput = ruleElement.querySelector(".section-input");
-    const resourceTypeCheckboxes = ruleElement.querySelectorAll(
-      ".advanced__resource-types input[type='checkbox']"
-    );
-
-    const resourceTypes = Array.from(resourceTypeCheckboxes)
-      .filter((checkbox) => checkbox.checked)
-      .map((checkbox) => checkbox.value);
 
     const data = {
       fromUrl: fromUrlInput.value,
       toUrl: toUrlInput.value,
       name: nameInput ? nameInput.value : "",
-      section: sectionInput ? sectionInput.value : "",
-      resourceTypes: resourceTypes,
+      section: sectionInput ? sectionInput.value : ""
     };
 
     this.ruleManager.updateRule(index, data);
@@ -909,56 +803,6 @@ class PopupUI {
     if (!url) return "Unknown URL";
     if (url.length <= maxLength) return url;
     return url.substring(0, maxLength - 3) + "...";
-  }
-
-  /**
-   * Set up test functionality for a rule
-   */
-  setupTestFunctionality(ruleElement, rule, testInput, testBtn, testResult) {
-    if (!testInput || !testBtn || !testResult) {
-      console.warn("Test functionality elements not provided", rule);
-      return;
-    }
-
-    testBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-
-      const inputUrl = testInput.value.trim();
-      if (!inputUrl) {
-        testResult.textContent = "Please enter a URL to test";
-        testResult.style.display = "block";
-        testResult.className = "test-section__result error";
-        return;
-      }
-
-      // Get the current rule data from the form
-      const ruleIndex = ruleElement.getAttribute("data-index");
-      const currentRule = this.ruleManager.rules[ruleIndex];
-
-      // Test with the current rule data
-      chrome.runtime.sendMessage(
-        {
-          action: "testUrlMatch",
-          inputUrl: inputUrl,
-          rule: currentRule.toObject()
-        },
-        (response) => {
-          if (response && response.matched) {
-            testResult.innerHTML = `✅ Match! Will redirect to:<br>${response.redirectUrl}`;
-            testResult.className = "test-section__result success";
-          } else {
-            testResult.textContent = "❌ No match. This URL won't be redirected.";
-            testResult.className = "test-section__result error";
-          }
-          testResult.style.display = "block";
-        }
-      );
-    });
-
-    // Prevent input field clicks from collapsing the rule
-    testInput.addEventListener("click", (e) => {
-      e.stopPropagation();
-    });
   }
 
   /**
@@ -1117,45 +961,54 @@ class PopupUI {
   }
 
   /**
-   * Process imported rules from JSON data
+   * Process imported rules
    */
   async processImportedRules(jsonData) {
-    const importedRules = JSON.parse(jsonData);
+    try {
+      const data = JSON.parse(jsonData);
+      let rules = Array.isArray(data) ? data : data.rules || [];
 
-    if (!Array.isArray(importedRules)) {
-      this.showImportExportStatus(
-        "Invalid file format. Expected an array of rules.",
-        false
-      );
-      return;
-    }
-
-    const validRules = importedRules.filter(
-      (rule) =>
-        rule &&
+      // Validate rules
+      const validRules = rules.filter(
+        (rule) =>
         typeof rule === "object" &&
         typeof rule.fromUrl === "string" &&
-        typeof rule.toUrl === "string" &&
-        (!rule.resourceTypes || Array.isArray(rule.resourceTypes))
-    );
+        typeof rule.toUrl === "string"
+      );
 
-    if (validRules.length === 0) {
-      this.showImportExportStatus("No valid rules found in the file.", false);
-      return;
+      if (validRules.length === 0) {
+        this.showImportExportStatus("No valid rules found in the file.", false);
+        return;
+      }
+
+      // Clear existing rules
+      this.ruleManager.rules = [];
+
+      // Add imported rules
+      validRules.forEach(rule => {
+        const newRule = new RedirectRule(rule);
+        this.ruleManager.rules.push(newRule);
+      });
+
+      // Save to storage
+      await this.ruleManager.saveRules();
+
+      // Update UI
+      this.displayRules();
+      this.displaySections();
+
+      // Show success message
+      this.showImportExportStatus(
+        `Successfully imported ${validRules.length} rules.`,
+        true
+      );
+    } catch (error) {
+      console.error("Error parsing imported rules:", error);
+      this.showImportExportStatus(
+        "Error importing rules. Please check the file format.",
+        false
+      );
     }
-
-    // Add each valid rule to the rule manager
-    validRules.forEach(ruleData => {
-      const newRule = new RedirectRule(ruleData);
-      this.ruleManager.rules.push(newRule);
-    });
-
-    await this.ruleManager.saveRules();
-    this.displayRules();
-    this.showImportExportStatus(
-      `Successfully imported ${validRules.length} rules!`,
-      true
-    );
   }
 
   /**
@@ -1186,22 +1039,23 @@ class PopupUI {
    * Show diagnostic dialog with active rules
    */
   showDiagnosticDialog() {
-    chrome.runtime.sendMessage({ action: "getActiveRules" }, (response) => {
-      if (response.error) {
-        alert(`Error: ${response.error}`);
+    chrome.runtime.sendMessage({ action: "getDiagnosticInfo" }, (response) => {
+      if (!response || !response.rules) {
+        alert("Could not retrieve diagnostic information.");
         return;
       }
 
-      const rules = response.rules || [];
-      let report = `Active Rules: ${rules.length}\n\n`;
+      const { rules, enabled } = response;
+      let report = `Redirect Status: ${enabled ? "Enabled" : "Disabled"}\n`;
+      report += `Active Rules: ${rules.length}\n\n`;
 
       rules.forEach((rule) => {
-        report += `--- Rule ${rule.id} ---\n`;
-
-        if (rule.condition.regexFilter) {
-          report += `Pattern: ${rule.condition.regexFilter}\n`;
-        } else if (rule.condition.urlFilter) {
-          report += `URL Filter: ${rule.condition.urlFilter}\n`;
+        report += `Rule ID: ${rule.id}\n`;
+        
+        if (rule.condition.urlFilter) {
+          report += `Pattern: ${rule.condition.urlFilter}\n`;
+        } else if (rule.condition.regexFilter) {
+          report += `Regex: ${rule.condition.regexFilter}\n`;
         }
 
         if (rule.action.redirect.regexSubstitution) {
@@ -1210,38 +1064,41 @@ class PopupUI {
           report += `Redirect: ${rule.action.redirect.url}\n`;
         }
 
-        report += `Resources: ${rule.condition.resourceTypes.join(", ")}\n\n`;
+        report += `\n`;
       });
 
       // Create a more stylish alert dialog using BEM classes
-      const dialogContainer = document.createElement("div");
-      dialogContainer.className = "dialog-overlay";
-
+      const overlay = document.createElement("div");
+      overlay.className = "dialog-overlay";
+      
       const dialog = document.createElement("div");
       dialog.className = "dialog";
-
+      
       const heading = document.createElement("h3");
       heading.className = "dialog__heading";
-      heading.textContent = "Active Redirect Rules";
-
-      const content = document.createElement("pre");
+      heading.textContent = "Diagnostic Information";
+      
+      const content = document.createElement("div");
       content.className = "dialog__content";
-      content.textContent = report;
-
+      
+      const pre = document.createElement("pre");
+      pre.className = "dialog__pre";
+      pre.textContent = report;
+      content.appendChild(pre);
+      
       const closeBtn = document.createElement("button");
-      closeBtn.textContent = "Close";
       closeBtn.className = "btn dialog__btn";
-
+      closeBtn.textContent = "Close";
       closeBtn.addEventListener("click", () => {
-        document.body.removeChild(dialogContainer);
+        document.body.removeChild(overlay);
       });
-
+      
       dialog.appendChild(heading);
       dialog.appendChild(content);
       dialog.appendChild(closeBtn);
-      dialogContainer.appendChild(dialog);
-
-      document.body.appendChild(dialogContainer);
+      
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
     });
   }
 
@@ -1287,62 +1144,6 @@ class PopupUI {
       this.elements.testUrlResult.innerHTML = html;
       this.elements.testUrlResult.style.display = "block";
     });
-  }
-
-  /**
-   * Test the current page URL
-   */
-  testCurrentPageUrl() {
-    // Get current active tab URL
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.url) {
-        this.elements.testUrlInput.value = tabs[0].url;
-        this.testUrl();
-      } else {
-        this.elements.testUrlResult.innerHTML =
-          '<div class="test-result error">Could not get current tab URL</div>';
-        this.elements.testUrlResult.style.display = "block";
-      }
-    });
-  }
-
-  /**
-   * Test a URL against all rules
-   */
-  testUrl() {
-    const url = this.elements.testUrlInput.value.trim();
-    if (!url) {
-      this.elements.testUrlResult.textContent = "Please enter a URL to test";
-      this.elements.testUrlResult.className = "test-url__result error";
-      this.elements.testUrlResult.classList.remove("hidden");
-      return;
-    }
-
-    // Find matching rules
-    const matchingRules = this.ruleManager.testUrl(url);
-
-    // Display results
-    if (matchingRules.length > 0) {
-      let resultHTML = `<div class="test-url__result-header success">✅ URL will be redirected</div>`;
-
-      matchingRules.forEach(({ rule, redirectUrl }) => {
-        resultHTML += `
-          <div class="test-url__result-item">
-            <div class="test-url__result-rule">Rule: ${this.extractDomain(rule.fromUrl)} → ${this.extractDomain(rule.toUrl)}</div>
-            <div class="test-url__result-redirect">Redirects to: ${redirectUrl}</div>
-          </div>
-        `;
-      });
-
-      this.elements.testUrlResult.innerHTML = resultHTML;
-      this.elements.testUrlResult.className = "test-url__result success";
-    } else {
-      this.elements.testUrlResult.textContent =
-        "❌ No matching rules found. URL won't be redirected.";
-      this.elements.testUrlResult.className = "test-url__result error";
-    }
-
-    this.elements.testUrlResult.classList.remove("hidden");
   }
 
   /**

@@ -123,18 +123,16 @@ async function updateRedirectRules() {
 
 // Create a declarativeNetRequest rule object from our rule format
 function createRuleObject(rule, id) {
-  const resourceTypes =
-    rule.resourceTypes?.length > 0
-      ? rule.resourceTypes
-      : [
-          "main_frame",
-          "sub_frame",
-          "stylesheet",
-          "script",
-          "image",
-          "xmlhttprequest",
-          "other",
-        ];
+  // Default resource types for all rules
+  const resourceTypes = [
+    "main_frame",
+    "sub_frame",
+    "stylesheet",
+    "script",
+    "image",
+    "xmlhttprequest",
+    "other",
+  ];
 
   const {fromUrl, toUrl} = rule;
   const wildcardIndex = fromUrl.indexOf("**");
@@ -294,6 +292,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const rules = await chrome.declarativeNetRequest.getDynamicRules();
         return {rules};
+      } catch (error) {
+        return {error: error.message};
+      }
+    },
+
+    // Get diagnostic information
+    getDiagnosticInfo: async () => {
+      try {
+        const rules = await chrome.declarativeNetRequest.getDynamicRules();
+        const enabled = await chrome.storage.local.get(["enabled"]).then(result => result.enabled || false);
+        return {rules, enabled};
       } catch (error) {
         return {error: error.message};
       }

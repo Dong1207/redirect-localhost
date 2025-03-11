@@ -38,7 +38,6 @@
         <div class="debug__tabs">
           <div class="debug__tab debug__tab--active" data-tab="history">Redirect History</div>
           <div class="debug__tab" data-tab="tools">Debug Tools</div>
-          <div class="debug__tab" data-tab="test">URL Tester</div>
         </div>
 
         <div id="historyTab" class="debug__content debug__content--active">
@@ -66,12 +65,6 @@
             </button>
           </div>
 
-          <div class="tools__item">
-            <button id="testCurrentPageBtn" class="btn tools__btn">
-              <i class="fas fa-globe"></i> Test Current Page URL
-            </button>
-          </div>
-
           <div class="import-export">
             <button id="exportRulesBtn" class="btn import-export__btn btn--primary">
               <i class="fas fa-download"></i> Export Rules
@@ -81,23 +74,6 @@
               <i class="fas fa-upload"></i> Import Rules
             </button>
           </div>
-        </div>
-
-        <div id="testTab" class="debug__content">
-          <div class="test-url">
-            <label class="test-url__label">Test URL:</label>
-            <input
-              type="text"
-              id="testUrlInput"
-              class="test-url__input"
-              placeholder="https://cdn.shopify.com/..."
-            />
-            <button id="testUrlBtn" class="btn test-url__btn btn--primary">
-              Test URL
-            </button>
-          </div>
-
-          <div id="testUrlResult" class="test-url__result hidden"></div>
         </div>
       </div>
 
@@ -162,47 +138,7 @@
 
             <!-- Hidden advanced sections -->
             <div class="advanced__sections" style="display: none;">
-              <div class="rule__form-group">
-                <label class="rule__label">Resource Types:</label>
-                <div class="advanced__resource-types">
-                  <label class="advanced__resource-label">
-                    <input type="checkbox" value="main_frame" checked />
-                    Pages
-                  </label>
-                  <label class="advanced__resource-label">
-                    <input type="checkbox" value="stylesheet" checked />
-                    CSS
-                  </label>
-                  <label class="advanced__resource-label">
-                    <input type="checkbox" value="script" checked /> 
-                    JS
-                  </label>
-                  <label class="advanced__resource-label">
-                    <input type="checkbox" value="image" checked />
-                    Images
-                  </label>
-                  <label class="advanced__resource-label">
-                    <input type="checkbox" value="xmlhttprequest" checked />
-                    XHR
-                  </label>
-                  <label class="advanced__resource-label">
-                    <input type="checkbox" value="other" checked />
-                    Other
-                  </label>
-                </div>
-              </div>
-              <div class="advanced__test">
-                <h4 class="advanced__test-title">Test Redirect</h4>
-                <div class="advanced__test-container">
-                  <input
-                    type="text"
-                    class="advanced__test-input test-input"
-                    placeholder="Enter full URL to test including https://"
-                  />
-                  <button class="btn advanced__test-btn btn--primary test-btn">Test</button>
-                </div>
-                <div class="advanced__test-result test-result"></div>
-              </div>
+              <!-- Advanced options will be added dynamically -->
             </div>
           </div>
         </div>
