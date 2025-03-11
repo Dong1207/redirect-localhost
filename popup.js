@@ -31,7 +31,7 @@ class RedirectRule {
     this.fromUrl = data.fromUrl || "";
     this.toUrl = data.toUrl || "";
     this.name = data.name || "";
-    this.section = data.section || "";
+    this.section = data.section || "Default";
     this.disabled = data.disabled || false;
   }
 
@@ -124,12 +124,27 @@ class RuleManager {
         this.enabled = result.enabled || false;
         this.sections = result.sections || {};
         
+        // Ensure all rules have a section
+        this.rules.forEach(rule => {
+          if (!rule.section) {
+            rule.section = "Default";
+          }
+        });
+        
         // Initialize sections from rules if not already in storage
         this.rules.forEach(rule => {
           if (rule.section && !this.sections.hasOwnProperty(rule.section)) {
             this.sections[rule.section] = { enabled: true };
           }
         });
+        
+        // Ensure there's at least one section
+        if (Object.keys(this.sections).length === 0 && this.rules.length > 0) {
+          this.sections["Default"] = { enabled: true };
+          this.rules.forEach(rule => {
+            rule.section = "Default";
+          });
+        }
         
         resolve();
       });
@@ -292,8 +307,8 @@ class RuleManager {
         return;
       }
 
-      const result = rule.testUrl(url);
-      if (result.matches) {
+        const result = rule.testUrl(url);
+        if (result.matches) {
         matches.push({
           rule,
           index,
@@ -341,7 +356,7 @@ class PopupUI {
     this.elements.clearHistoryBtn.addEventListener("click", () => this.clearRedirectHistory());
     this.elements.exportRulesBtn.addEventListener("click", () => this.exportRules());
     this.elements.importRulesBtn.addEventListener("click", () => this.importRules());
-    
+
     // Debug toggle setup
     chrome.storage.local.get(["debugToPage"], (result) => {
       this.elements.debugToPageToggle.checked = result.debugToPage === true;
@@ -416,44 +431,32 @@ class PopupUI {
   }
 
   /**
-   * Display all rules in the UI
+   * Display all sections in the UI
    */
-  displayRules() {
-    this.elements.rulesContainer.innerHTML = "";
-
-    if (this.ruleManager.rules.length === 0) {
-      return;
+  displaySections() {
+    const sectionsContainer = this.elements.rulesContainer;
+    
+    // Remove all existing sections
+    const existingSections = sectionsContainer.querySelectorAll('.section');
+    existingSections.forEach(section => section.remove());
+    
+    // Get all sections
+    const sections = this.ruleManager.getSections();
+    
+    // If no sections exist, create a default section
+    if (sections.length === 0) {
+      this.ruleManager.setSectionEnabled('Default', true);
+      this.ruleManager.saveRules();
+      sections.push('Default');
     }
-
-    // Group rules by section
-    const rulesBySection = {};
-    const rulesWithoutSection = [];
-
-    this.ruleManager.rules.forEach((rule, index) => {
-      if (rule.section) {
-        if (!rulesBySection[rule.section]) {
-          rulesBySection[rule.section] = [];
-        }
-        rulesBySection[rule.section].push({ rule, index });
-      } else {
-        rulesWithoutSection.push({ rule, index });
-      }
+    
+    // Display sections with their rules
+    sections.forEach(sectionName => {
+      const sectionElement = this.createSectionElement(sectionName);
+      sectionsContainer.appendChild(sectionElement);
     });
-
-    // First display rules without a section
-    rulesWithoutSection.forEach(({ rule, index }) => {
-      const ruleElement = this.initializeRuleElement(rule, index);
-      this.elements.rulesContainer.appendChild(ruleElement);
-    });
-
-    // Then display rules grouped by section
-    Object.keys(rulesBySection).forEach(sectionName => {
-      rulesBySection[sectionName].forEach(({ rule, index }) => {
-        const ruleElement = this.initializeRuleElement(rule, index);
-        this.elements.rulesContainer.appendChild(ruleElement);
-      });
-    });
-
+    
+    // Update all rule statuses
     this.updateAllRuleStatuses();
   }
 
@@ -574,7 +577,7 @@ class PopupUI {
 
     this.ruleManager.updateRule(index, data);
     await this.ruleManager.saveRules();
-    
+
     const rule = this.ruleManager.rules[index];
     this.updateRuleTitle(ruleElement, rule);
   }
@@ -585,7 +588,7 @@ class PopupUI {
   async deleteRule(index) {
     this.ruleManager.deleteRule(index);
     await this.ruleManager.saveRules();
-    this.displayRules();
+    this.displaySections();
   }
 
   /**
@@ -613,7 +616,7 @@ class PopupUI {
   updateRuleStatus(ruleElement, rule, isEnabled) {
     const statusIndicator = ruleElement.querySelector(".rule__status");
     const toggleBtn = ruleElement.querySelector(".rule__toggle-btn");
-    
+
     // Check if the rule's section is enabled
     const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
     const effectivelyEnabled = isEnabled && !rule.disabled && sectionEnabled;
@@ -851,25 +854,26 @@ class PopupUI {
   }
 
   /**
-   * Process imported rules
+   * Process imported rules from JSON
    */
   async processImportedRules(jsonData) {
     try {
-      const data = JSON.parse(jsonData);
-      let rules = Array.isArray(data) ? data : data.rules || [];
+    const importedRules = JSON.parse(jsonData);
+
+    if (!Array.isArray(importedRules)) {
+        this.showImportExportStatus("Invalid file format. Expected an array of rules.", false);
+      return;
+    }
 
       // Validate rules
-      const validRules = rules.filter(
-        (rule) =>
-        typeof rule === "object" &&
-        typeof rule.fromUrl === "string" &&
-        typeof rule.toUrl === "string"
-      );
+      const validRules = importedRules.filter(rule => 
+        rule.fromUrl !== undefined && rule.toUrl !== undefined
+    );
 
-      if (validRules.length === 0) {
-        this.showImportExportStatus("No valid rules found in the file.", false);
-        return;
-      }
+    if (validRules.length === 0) {
+      this.showImportExportStatus("No valid rules found in the file.", false);
+      return;
+    }
 
       // Clear existing rules
       this.ruleManager.rules = [];
@@ -877,20 +881,33 @@ class PopupUI {
       // Add imported rules
       validRules.forEach(rule => {
         const newRule = new RedirectRule(rule);
-        this.ruleManager.rules.push(newRule);
+        
+        // Ensure all rules have a section
+        if (!newRule.section) {
+          newRule.section = 'Default';
+        }
+        
+      this.ruleManager.rules.push(newRule);
+    });
+
+      // Initialize sections from imported rules
+      this.ruleManager.rules.forEach(rule => {
+        if (rule.section && !this.ruleManager.sections.hasOwnProperty(rule.section)) {
+          this.ruleManager.sections[rule.section] = { enabled: true };
+        }
       });
 
       // Save to storage
-      await this.ruleManager.saveRules();
+    await this.ruleManager.saveRules();
 
-      // Update UI
-      this.displayRules();
+      // Update UI - displaySections will also handle displaying rules without sections
+      this.displaySections();
 
       // Show success message
-      this.showImportExportStatus(
+    this.showImportExportStatus(
         `Successfully imported ${validRules.length} rules.`,
-        true
-      );
+      true
+    );
     } catch (error) {
       console.error("Error parsing imported rules:", error);
       this.showImportExportStatus(
@@ -928,18 +945,30 @@ class PopupUI {
    * Display all sections in the UI
    */
   displaySections() {
-    this.elements.rulesContainer.innerHTML = "";
+    const sectionsContainer = this.elements.rulesContainer;
     
+    // Remove all existing sections
+    const existingSections = sectionsContainer.querySelectorAll('.section');
+    existingSections.forEach(section => section.remove());
+    
+    // Get all sections
     const sections = this.ruleManager.getSections();
     
+    // If no sections exist, create a default section
     if (sections.length === 0) {
-      return;
+      this.ruleManager.setSectionEnabled('Default', true);
+      this.ruleManager.saveRules();
+      sections.push('Default');
     }
     
+    // Display sections with their rules
     sections.forEach(sectionName => {
       const sectionElement = this.createSectionElement(sectionName);
-      this.elements.rulesContainer.appendChild(sectionElement);
+      sectionsContainer.appendChild(sectionElement);
     });
+    
+    // Update all rule statuses
+    this.updateAllRuleStatuses();
   }
   
   /**
@@ -1109,7 +1138,7 @@ class PopupUI {
       statusIndicator.classList.add('section__status--inactive');
       toggleBtn.classList.add('section__toggle-btn--inactive');
       sectionElement.setAttribute('data-disabled', 'true');
-    } else {
+      } else {
       statusIndicator.classList.add('section__status--active');
       statusIndicator.classList.remove('section__status--inactive');
       toggleBtn.classList.remove('section__toggle-btn--inactive');
@@ -1164,14 +1193,26 @@ class PopupUI {
    */
   async deleteSection(sectionName) {
     // Confirm deletion
-    if (!confirm(`Are you sure you want to delete the section "${sectionName}"?\n\nRules in this section will not be deleted, but they will no longer be in a section.`)) {
+    if (!confirm(`Are you sure you want to delete the section "${sectionName}"?`)) {
       return;
     }
     
-    // Remove section from rules
+    // Get all sections
+    const sections = this.ruleManager.getSections();
+    
+    // If this is the only section, don't allow deletion
+    if (sections.length === 1) {
+      alert("Cannot delete the only section. At least one section must exist.");
+      return;
+    }
+    
+    // Find another section to move rules to
+    const targetSection = sections.find(section => section !== sectionName) || 'Default';
+    
+    // Move rules to another section
     this.ruleManager.rules.forEach(rule => {
       if (rule.section === sectionName) {
-        rule.section = "";
+        rule.section = targetSection;
       }
     });
     
@@ -1181,9 +1222,8 @@ class PopupUI {
     // Save changes
     await this.ruleManager.saveRules();
     
-    // Update UI
+    // Update UI - displaySections will also handle displaying rules without sections
     this.displaySections();
-    this.displayRules();
   }
 
   /**
@@ -1199,9 +1239,8 @@ class PopupUI {
     // Save changes
     await this.ruleManager.saveRules();
     
-    // Update UI
+    // Update UI - displaySections will also handle displaying rules without sections
     this.displaySections();
-    this.displayRules();
   }
 
   /**
@@ -1280,7 +1319,7 @@ class PopupUI {
         element.textContent = originalText;
         return;
       }
-      
+
       // If unchanged, do nothing
       if (newName === sectionName) {
         return;
@@ -1294,12 +1333,19 @@ class PopupUI {
         return;
       }
       
-      // Update section name
+      // Update section name in rules
       this.ruleManager.rules.forEach(rule => {
         if (rule.section === sectionName) {
           rule.section = newName;
         }
       });
+      
+      // Update section name in sections object
+      if (this.ruleManager.sections[sectionName] !== undefined) {
+        const sectionState = this.ruleManager.sections[sectionName];
+        this.ruleManager.sections[newName] = sectionState;
+        delete this.ruleManager.sections[sectionName];
+      }
       
       // Save changes
       await this.ruleManager.saveRules();

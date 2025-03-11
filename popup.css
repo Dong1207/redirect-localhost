@@ -758,8 +758,7 @@ input:checked+.slider:before {
 }
 
 .add-section:hover {
-    background-color: #e0e0e0;
-    border-color: #999;
+    background-color: #3e8e41;
 }
 
 /* Section delete button */
@@ -863,5 +862,5 @@ input:checked+.slider:before {
 }
 
 .section__edit-btn:hover {
-    color: #0b7dda;
+    background-color: #0b7dda;
 }
