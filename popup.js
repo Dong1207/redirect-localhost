@@ -1286,10 +1286,22 @@ class PopupUI {
    */
   toggleDonateView(isVisible) {
     const { donateContainer, rulesContainer, addSectionBtn, debugPanel } = this.elements;
+    
+    console.log("toggleDonateView called with isVisible:", isVisible);
+    console.log("addSectionBtn before:", addSectionBtn.classList.contains("hidden") ? "hidden" : "visible");
+    
     // Toggle visibility of elements
     donateContainer.classList.toggle("hidden", !isVisible);
     rulesContainer.classList.toggle("hidden", isVisible);
-    addSectionBtn.classList.toggle("hidden", isVisible);
+    
+    // Ensure the addSectionBtn is properly hidden/shown
+    if (isVisible) {
+      addSectionBtn.classList.add("hidden");
+    } else {
+      addSectionBtn.classList.remove("hidden");
+    }
+    
+    console.log("addSectionBtn after:", addSectionBtn.classList.contains("hidden") ? "hidden" : "visible");
     
     // Also hide debug panel when showing donate view
     if (isVisible && !debugPanel.classList.contains("hidden")) {
