@@ -1,4 +1,4 @@
-# Redirect Localhost Extension
+# Redirect Manager Extension
 
 This extension allows you to redirect URLs to localhost or other destinations based on configurable rules.
 
@@ -20,9 +20,9 @@ The codebase has been refactored to use a modular architecture:
 │       ├── RuleUI.js        # Rule UI controller
 │       └── SectionUI.js     # Section UI controller
 ├── utils.js                 # Utility functions
-├── popup.js                 # Entry point for the popup
-├── popup.html               # Popup HTML
-└── popup.css                # Popup styles
+├── redirect-manager.js      # Entry point for the UI
+├── redirect-manager.html    # Main HTML file
+└── redirect-manager.css     # Styles
 ```
 
 ## Architecture
