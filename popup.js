@@ -1285,11 +1285,17 @@ class PopupUI {
    * @param {boolean} isVisible - Whether to show the donate view
    */
   toggleDonateView(isVisible) {
-    const { donateContainer, rulesContainer, addSectionBtn } = this.elements;
+    const { donateContainer, rulesContainer, addSectionBtn, debugPanel } = this.elements;
     // Toggle visibility of elements
     donateContainer.classList.toggle("hidden", !isVisible);
     rulesContainer.classList.toggle("hidden", isVisible);
     addSectionBtn.classList.toggle("hidden", isVisible);
+    
+    // Also hide debug panel when showing donate view
+    if (isVisible && !debugPanel.classList.contains("hidden")) {
+      debugPanel.classList.add("hidden");
+    }
+    
     // Add click handler for the donate container to go back
     if (isVisible) {
       // Use event delegation to handle clicks on the container
