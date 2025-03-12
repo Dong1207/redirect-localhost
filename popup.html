@@ -18,26 +18,23 @@
           <span class="toggle__slider toggle__slider--round slider round"></span>
         </label>
         <span class="toggle__label">Enable Redirect</span>
+        <span class="stats__text">Redirected: <span id="redirectCount">0</span></span>
 
         <div class="controls">
           <button id="debugBtn" class="btn controls__btn">
-            <i class="fas fa-bug"></i> Debug
+            <i class="fas fa-bug"></i>
           </button>
           <button id="donateBtn" class="btn controls__btn">
-            <i class="fas fa-donate"></i> Donate
+            <i class="fas fa-donate"></i>
           </button>
         </div>
-      </div>
-
-      <div class="stats">
-        <p class="stats__text">Redirected requests: <span id="redirectCount">0</span></p>
       </div>
 
       <!-- Debug panel (initially hidden) -->
       <div id="debugPanel" class="debug hidden">
         <div class="debug__tabs">
-          <div class="debug__tab debug__tab--active" data-tab="history">Redirect History</div>
-          <div class="debug__tab" data-tab="tools">Import/Export</div>
+          <div class="debug__tab debug__tab--active" data-tab="history">History</div>
+          <div class="debug__tab" data-tab="tools">Tools</div>
         </div>
 
         <div id="historyTab" class="debug__content debug__content--active">
@@ -46,10 +43,10 @@
               <input type="checkbox" id="debugToPageToggle" class="toggle__input" />
               <span class="toggle__slider toggle__slider--round slider round"></span>
             </label>
-            <label for="debugToPageToggle" class="debug-toggle__label">Log to page console</label>
+            <label for="debugToPageToggle" class="debug-toggle__label">Log extension redirects to console</label>
 
             <button id="clearHistoryBtn" class="btn debug-toggle__btn">
-              Clear History
+              Clear
             </button>
           </div>
 
@@ -61,11 +58,11 @@
         <div id="toolsTab" class="debug__content">
           <div class="import-export">
             <button id="exportRulesBtn" class="btn import-export__btn btn--primary">
-              <i class="fas fa-download"></i> Export Rules
+              <i class="fas fa-download"></i> Export
             </button>
 
             <button id="importRulesBtn" class="btn import-export__btn btn--primary">
-              <i class="fas fa-upload"></i> Import Rules
+              <i class="fas fa-upload"></i> Import
             </button>
           </div>
         </div>
@@ -75,14 +72,14 @@
         <!-- Sections will be added here dynamically -->
       </div>
 
-      <button id="addSectionBtn" class="add-section">+ Add New Section</button>
+      <button id="addSectionBtn" class="add-section">+ Add Section</button>
       
       <!-- Donate Container (initially hidden) -->
       <div id="donateContainer" class="donate-container hidden">
         <div class="donate-header">
           <h2 class="donate-title">Support This Project</h2>
           <button id="backToRulesBtn" class="btn back-btn">
-            <i class="fas fa-arrow-left"></i> Back
+            <i class="fas fa-arrow-left"></i>
           </button>
         </div>
         <div class="donate-body">
@@ -134,8 +131,7 @@
                 placeholder="http://localhost:3000/**"
               />
               <p class="rule__hint">
-                Parts matched by ** will replace ** in To URL. Use http:// for
-                localhost.
+                Parts matched by ** will replace ** in To URL
               </p>
             </div>
           </div>

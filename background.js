@@ -48,7 +48,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // Helper function for logging to both extension console and page
 function debugLog(...args) {
-  console.log(...args);
+  console.log("[EXTENSION-REDIRECT]", ...args);
 
   if (!debugToPage) return;
 
@@ -56,6 +56,11 @@ function debugLog(...args) {
     if (!tabs[0]) return;
     
     try {
+      // Check if the URL is valid before trying to construct a URL object
+      if (!tabs[0].url || !tabs[0].url.startsWith('http')) {
+        return; // Skip non-http URLs silently
+      }
+      
       // Check if the tab URL is http/https
       const tabUrl = new URL(tabs[0].url);
       if (tabUrl.protocol !== 'http:' && tabUrl.protocol !== 'https:') {
@@ -71,12 +76,28 @@ function debugLog(...args) {
         chrome.scripting
           .executeScript({
             target: {tabId: tabs[0].id},
-            func: (args) => console.log("[REDIRECT-EXTENSION]", ...args),
+            func: (args) => console.log("[EXTENSION-REDIRECT]", ...args),
             args: [args],
           })
-          .catch((err) => console.error("Failed to log to page console:", err));
+          .catch((err) => {
+            // Don't log errors for expected cases like invalid URLs
+            if (err.message && (
+                err.message.includes("Cannot access") || 
+                err.message.includes("Invalid URL") ||
+                err.message.includes("chrome-extension://")
+              )) {
+              // These are expected errors, don't log them
+              return;
+            }
+            console.error("Failed to log to page console:", err);
+          });
       });
     } catch (error) {
+      // Don't log errors for expected cases like invalid URLs
+      if (error instanceof TypeError && error.message.includes('Invalid URL')) {
+        // This is expected for chrome:// URLs, new tabs, etc.
+        return;
+      }
       console.error("Error in debugLog:", error);
     }
   });
@@ -250,14 +271,6 @@ function recordRedirect(fromUrl, toUrl, ruleDetails = "Unknown rule") {
   });
 }
 
-// Listen for redirect events
-if (chrome.webRequest?.onBeforeRedirect) {
-  chrome.webRequest.onBeforeRedirect.addListener(
-    (details) => recordRedirect(details.url, details.redirectUrl),
-    {urls: ["<all_urls>"]}
-  );
-}
-
 // Debug redirect matches
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
@@ -276,9 +289,10 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
           }`
         : "Unknown rule";
 
-      debugLog("Rule matched:", {
-        url: requestUrl,
-        redirectUrl,
+      // Only log redirects that are processed by our extension
+      debugLog("Redirect processed:", {
+        from: requestUrl,
+        to: redirectUrl,
         ruleId: info.rule.ruleId,
         details: ruleDetails,
       });
@@ -425,6 +439,13 @@ async function handleDebugToggle(enabled) {
         await injectDebugScript();
         return {success: true, debugEnabled: true};
       } catch (error) {
+        // Don't treat URL-related errors as failures
+        if (error instanceof TypeError && error.message.includes('Invalid URL')) {
+          console.log("Debug mode enabled, but current tab has invalid URL format");
+          return {success: true, debugEnabled: true, warning: "Current tab is not a valid HTTP page"};
+        }
+        
+        // Handle other errors
         console.error("Debug script injection error:", error);
         debugToPage = false;
         await chrome.storage.local.set({debugToPage: false});
@@ -469,9 +490,15 @@ async function injectDebugScript() {
     const activeTab = tabs[0];
     
     // Extract the origin from the active tab URL
-    let tabUrl;
     try {
-      tabUrl = new URL(activeTab.url);
+      // Check if the URL is valid before trying to construct a URL object
+      if (!activeTab.url || !activeTab.url.startsWith('http')) {
+        // This is an expected case for chrome:// URLs, new tabs, etc.
+        console.log("Debug script not injected: not a valid http/https page");
+        return;
+      }
+      
+      const tabUrl = new URL(activeTab.url);
       
       // Only inject on http/https pages
       if (tabUrl.protocol !== 'http:' && tabUrl.protocol !== 'https:') {
@@ -487,7 +514,14 @@ async function injectDebugScript() {
       
       console.log("Debug script injected into active tab:", tabUrl.origin);
     } catch (error) {
-      console.error("Error injecting debug script:", error);
+      // This is likely a URL parsing error, which is expected for certain tabs
+      // Don't show an error for this case as it's not a real problem
+      if (error instanceof TypeError && error.message.includes('Invalid URL')) {
+        console.log("Debug script not injected: invalid URL format");
+      } else {
+        // Log other unexpected errors
+        console.error("Error injecting debug script:", error);
+      }
     }
   } catch (error) {
     console.error("Failed to inject debug script:", error);

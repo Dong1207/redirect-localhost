@@ -276,6 +276,18 @@ class PopupUI {
   async init() {
     await this.updateRedirectCount();
     this.setupEventListeners();
+    
+    // Debug tab elements
+    console.log("Tabs:", this.elements.tabs.length, "elements");
+    this.elements.tabs.forEach((tab, i) => {
+      console.log(`Tab ${i}:`, tab.getAttribute("data-tab"), tab);
+    });
+    
+    console.log("Tab contents:", this.elements.tabContents.length, "elements");
+    this.elements.tabContents.forEach((content, i) => {
+      console.log(`Content ${i}:`, content.id, content);
+    });
+    
     this.setupTabs();
     // Display sections (which will contain rules)
     this.displaySections();
@@ -319,17 +331,38 @@ class PopupUI {
    * Set up tab navigation
    */
   setupTabs() {
+    console.log("Setting up tabs...");
+    
+    // Create a mapping of tab IDs to content elements
+    const tabMapping = {
+      'history': document.getElementById('historyTab'),
+      'tools': document.getElementById('toolsTab')
+    };
+    
+    console.log("Tab mapping:", tabMapping);
+    
     this.elements.tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
         const tabId = tab.getAttribute("data-tab");
+        console.log("Tab clicked:", tabId);
+        
         // Update active tab
         this.elements.tabs.forEach((t) => t.classList.remove("debug__tab--active"));
         tab.classList.add("debug__tab--active");
+        
         // Update active content
         this.elements.tabContents.forEach((content) => {
           content.classList.remove("debug__content--active");
         });
-        document.getElementById(`${tabId}Tab`).classList.add("debug__content--active");
+        
+        // Find the corresponding content element and make it active
+        const contentElement = tabMapping[tabId];
+        if (contentElement) {
+          console.log("Activating content for tab:", tabId, contentElement);
+          contentElement.classList.add("debug__content--active");
+        } else {
+          console.error(`Tab content not found for tab: ${tabId}`);
+        }
       });
     });
   }
@@ -652,17 +685,35 @@ class PopupUI {
    * Toggle debug panel visibility
    */
   toggleDebugPanel() {
+    const wasHidden = this.elements.debugPanel.classList.contains("hidden");
     this.elements.debugPanel.classList.toggle("hidden");
-    // If the panel is now visible, load the redirect history
-    if (!this.elements.debugPanel.classList.contains("hidden")) {
+    
+    // If the panel is now visible (was previously hidden)
+    if (wasHidden) {
+      console.log("Debug panel opened, initializing tabs");
       this.loadRedirectHistory();
-      // Make sure the first tab is active
-      this.elements.tabs.forEach((tab, index) => {
-        tab.classList.toggle("debug__tab--active", index === 0);
-      });
-      this.elements.tabContents.forEach((content, index) => {
-        content.classList.toggle("debug__content--active", index === 0);
-      });
+      
+      // Create a mapping of tab IDs to content elements
+      const tabMapping = {
+        'history': document.getElementById('historyTab'),
+        'tools': document.getElementById('toolsTab')
+      };
+      
+      // Make sure the first tab (history) is active
+      const historyTab = this.elements.tabs[0];
+      const toolsTab = this.elements.tabs[1];
+      
+      if (historyTab && toolsTab) {
+        // Activate history tab
+        historyTab.classList.add("debug__tab--active");
+        toolsTab.classList.remove("debug__tab--active");
+        
+        // Activate history content
+        if (tabMapping.history && tabMapping.tools) {
+          tabMapping.history.classList.add("debug__content--active");
+          tabMapping.tools.classList.remove("debug__content--active");
+        }
+      }
     }
   }
 
@@ -682,17 +733,17 @@ class PopupUI {
       history.forEach((item) => {
         const historyItem = document.createElement("div");
         historyItem.className = "history__item";
-        const fromUrl = this.truncateUrl(item.fromUrl, 60);
-        const toUrl = this.truncateUrl(item.toUrl, 60);
+        const fromUrl = this.truncateUrl(item.fromUrl, 40);
+        const toUrl = this.truncateUrl(item.toUrl, 40);
         const date = new Date(item.timestamp);
         const dateTimeString = date.toLocaleString(undefined, {
-          year: 'numeric', month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
+          month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit'
         });
         historyItem.innerHTML = `
           <div class="history__from"><strong>From:</strong> ${fromUrl}</div>
           <div class="history__to"><strong>To:</strong> ${toUrl}</div>
-          <div class="history__time"><strong>Time:</strong> ${dateTimeString}</div>
+          <div class="history__time">${dateTimeString}</div>
         `;
         this.elements.redirectHistory.appendChild(historyItem);
       });
@@ -827,8 +878,8 @@ class PopupUI {
     const existingStatus = container.querySelector(".import-export__status");
     if (existingStatus) existingStatus.remove();
     container.appendChild(statusElement);
-    // Auto-remove after 5 seconds
-    setTimeout(() => statusElement.remove(), 5000);
+    // Auto-remove after 3 seconds (reduced from 5)
+    setTimeout(() => statusElement.remove(), 3000);
   }
 
   /**
