@@ -157,6 +157,14 @@ export class RuleUI {
       ruleElement.removeAttribute("data-disabled");
       statusIndicator.title = "Rule is active";
     }
+    
+    // Update toggle button appearance based on rule.disabled state
+    // This ensures the toggle button reflects the actual rule state
+    if (rule.disabled) {
+      toggleBtn.classList.add("rule__toggle-btn--inactive");
+    } else {
+      toggleBtn.classList.remove("rule__toggle-btn--inactive");
+    }
   }
 
   /**

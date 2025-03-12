@@ -276,23 +276,72 @@ export class PopupUI {
     const rule = this.ruleManager.rules[index];
     if (!rule) return;
     
+    // Toggle the disabled state
     rule.disabled = !rule.disabled;
     
-    // Update UI
+    // Save changes first
+    await this.ruleManager.saveRules();
+    
+    // Update UI after saving
     const ruleElement = document.querySelector(`.rule[data-index="${index}"]`);
     if (ruleElement) {
       const sectionEnabled =
         !rule.section || this.ruleManager.isSectionEnabled(rule.section);
+      
+      // Add a visual feedback effect when toggling
+      const toggleBtn = ruleElement.querySelector(".rule__toggle-btn");
+      const statusIndicator = ruleElement.querySelector(".rule__status");
+      
+      if (toggleBtn) {
+        // Add a quick flash effect
+        toggleBtn.classList.add("button-flash");
+        setTimeout(() => {
+          toggleBtn.classList.remove("button-flash");
+        }, 300);
+        
+        // Update toggle button state immediately
+        if (rule.disabled) {
+          toggleBtn.classList.add("rule__toggle-btn--inactive");
+        } else {
+          toggleBtn.classList.remove("rule__toggle-btn--inactive");
+        }
+      }
+      
+      if (statusIndicator) {
+        // Update status indicator immediately
+        if (this.ruleManager.enabled && !rule.disabled && sectionEnabled) {
+          statusIndicator.classList.remove("rule__status--inactive");
+          statusIndicator.classList.add("rule__status--active");
+          statusIndicator.title = "Rule is active";
+        } else {
+          statusIndicator.classList.remove("rule__status--active");
+          statusIndicator.classList.add("rule__status--inactive");
+          
+          if (rule.disabled) {
+            statusIndicator.title = "Rule is disabled";
+          } else if (!sectionEnabled) {
+            statusIndicator.title = "Section is disabled";
+          } else if (!this.ruleManager.enabled) {
+            statusIndicator.title = "Redirect is globally disabled";
+          }
+        }
+      }
+      
+      // Also update the full rule status
       RuleUI.updateRuleStatus(
         ruleElement,
         rule,
         this.ruleManager.enabled && sectionEnabled,
         sectionEnabled
       );
+      
+      // Update rule element data attribute
+      if (rule.disabled) {
+        ruleElement.setAttribute("data-disabled", "true");
+      } else {
+        ruleElement.removeAttribute("data-disabled");
+      }
     }
-    
-    // Save changes
-    await this.ruleManager.saveRules();
   }
 
   /**

@@ -80,24 +80,37 @@ export class RuleManager {
    */
   _notifyBackgroundScript(resolve) {
     try {
+      // Set a timeout to resolve the promise even if we don't get a response
+      const timeoutId = setTimeout(() => {
+        console.log("Background notification timed out, but rules were saved");
+        resolve(true);
+      }, 500); // 500ms timeout
+      
       chrome.runtime.sendMessage({action: "rulesUpdated"}, (response) => {
+        clearTimeout(timeoutId); // Clear the timeout since we got a response
+        
+        // Check for runtime error (like message port closed)
         if (chrome.runtime.lastError) {
           console.log(
             "Background notification status: " +
               (chrome.runtime.lastError.message || "Unknown error")
           );
+          // Still resolve as true since the rules were saved to storage
+          resolve(true);
         } else if (response?.success) {
           console.log("Background script updated successfully");
+          resolve(true);
         } else {
           console.log(
             "Background script notification sent, no confirmation received"
           );
+          resolve(true);
         }
-        resolve(true);
       });
     } catch (err) {
       console.error("Failed to notify background script:", err);
-      resolve(false);
+      // Still resolve as true since the rules were saved to storage
+      resolve(true);
     }
   }
 

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sửa Lỗi Rule Toggle</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow: auto;
+      max-height: 400px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #333;
+    }
+    .instructions {
+      background-color: #e7f3fe;
+      border-left: 6px solid #2196F3;
+      padding: 10px;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sửa Lỗi Rule Toggle</h1>
+  
+  <div class="card">
+    <h2>Hướng dẫn</h2>
+    <div class="instructions">
+      <p>Công cụ này sẽ giúp bạn sửa lỗi khi bấm toggle rule không hoạt động.</p>
+      <p>Các bước thực hiện:</p>
+      <ol>
+        <li>Bấm nút "Sửa Lỗi Rule Toggle" để sửa các cài đặt cơ bản</li>
+        <li>Bấm nút "Toggle Rule '111'" để bật/tắt rule có tên "111"</li>
+        <li>Sau khi sửa xong, đóng và mở lại popup của extension để thấy thay đổi</li>
+      </ol>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Công cụ sửa lỗi</h2>
+    <button id="fixToggle">Sửa Lỗi Rule Toggle</button>
+    <button id="toggle111">Toggle Rule '111'</button>
+    <button id="toggleUnnamed">Toggle Rule Không Tên</button>
+    <button id="checkStatus">Kiểm Tra Trạng Thái</button>
+  </div>
+  
+  <div class="card">
+    <h2>Kết quả</h2>
+    <pre id="output">Kết quả sẽ hiển thị ở đây...</pre>
+  </div>
+  
+  <script src="fix-rule-toggle.js"></script>
+  <script>
+    // Override console.log to display in our output element
+    const originalLog = console.log;
+    const originalError = console.error;
+    const outputElement = document.getElementById('output');
+    
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      outputElement.textContent += args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+      ).join(' ') + '\n';
+    };
+    
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      outputElement.textContent += 'LỖI: ' + args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+      ).join(' ') + '\n';
+    };
+    
+    // Add button event listeners
+    document.getElementById('fixToggle').addEventListener('click', () => {
+      outputElement.textContent = ''; // Clear previous output
+      window.fixRuleToggle.fixRuleToggleIssue();
+    });
+    
+    document.getElementById('toggle111').addEventListener('click', () => {
+      window.fixRuleToggle.toggleRuleDirectly('111');
+    });
+    
+    document.getElementById('toggleUnnamed').addEventListener('click', () => {
+      window.fixRuleToggle.toggleRuleDirectly('');
+    });
+    
+    document.getElementById('checkStatus').addEventListener('click', async () => {
+      outputElement.textContent = ''; // Clear previous output
+      
+      // Get rules from storage
+      const result = await chrome.storage.local.get(["redirectRules", "enabled", "sections"]);
+      
+      console.log("Global redirect enabled:", result.enabled);
+      console.log("Sections:", result.sections);
+      
+      if (result.redirectRules && Array.isArray(result.redirectRules)) {
+        console.log("Total rules:", result.redirectRules.length);
+        console.log("All rules:", result.redirectRules);
+      } else {
+        console.log("No rules found in storage");
+      }
+    });
+  </script>
+</body>
+</html> 

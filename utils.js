@@ -13,38 +13,41 @@ const DOM = {
    */
   createElement(tag, attrs = {}, children = []) {
     const element = document.createElement(tag);
-    
+
     // Set attributes
     Object.entries(attrs).forEach(([key, value]) => {
-      if (key === 'className') {
+      if (key === "className") {
         element.className = value;
-      } else if (key === 'innerHTML') {
+      } else if (key === "innerHTML") {
         element.innerHTML = value;
-      } else if (key === 'textContent') {
+      } else if (key === "textContent") {
         element.textContent = value;
-      } else if (key.startsWith('data-')) {
+      } else if (key.startsWith("data-")) {
         element.setAttribute(key, value);
-      } else if (key === 'style' && typeof value === 'object') {
+      } else if (key === "style" && typeof value === "object") {
         Object.assign(element.style, value);
       } else {
         element[key] = value;
       }
     });
-    
+
     // Add children
     if (Array.isArray(children)) {
-      children.forEach(child => {
-        if (child) element.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+      children.forEach((child) => {
+        if (child)
+          element.appendChild(
+            typeof child === "string" ? document.createTextNode(child) : child
+          );
       });
     } else if (children instanceof Node) {
       element.appendChild(children);
     } else if (children) {
       element.textContent = children;
     }
-    
+
     return element;
   },
-  
+
   /**
    * Add event listeners to an element
    * @param {HTMLElement} element - The element to add listeners to
@@ -57,7 +60,7 @@ const DOM = {
     });
     return element;
   },
-  
+
   /**
    * Create a button with icon
    * @param {string} className - Button class name
@@ -67,18 +70,18 @@ const DOM = {
    * @returns {HTMLElement} The button element
    */
   createIconButton(className, title, iconClass, onClick) {
-    const button = this.createElement('button', {
+    const button = this.createElement("button", {
       className: `btn ${className}`,
       title,
-      innerHTML: `<i class="${iconClass}"></i>`
+      innerHTML: `<i class="${iconClass}"></i>`,
     });
-    
+
     if (onClick) {
-      button.addEventListener('click', onClick);
+      button.addEventListener("click", onClick);
     }
-    
+
     return button;
-  }
+  },
 };
 
 // URL utilities
@@ -97,7 +100,7 @@ const URLUtils = {
       return url;
     }
   },
-  
+
   /**
    * Truncate URL to specified length
    * @param {string} url - URL to truncate
@@ -106,9 +109,9 @@ const URLUtils = {
    */
   truncateUrl(url, maxLength = 30) {
     if (!url || url.length <= maxLength) return url;
-    return url.substring(0, maxLength - 3) + '...';
+    return url.substring(0, maxLength - 3) + "...";
   },
-  
+
   /**
    * Check if URL is valid for redirection
    * @param {string} url - URL to validate
@@ -117,19 +120,19 @@ const URLUtils = {
   isValidRedirectUrl(url) {
     // URL must not be empty
     if (!url) return false;
-    
+
     // URL must start with http:// or https://
-    if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
-    
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return false;
+
     // If URL contains wildcards, make sure they're valid
-    if (url.includes('**')) {
+    if (url.includes("**")) {
       // Only one wildcard pattern is allowed
       if ((url.match(/\*\*/g) || []).length > 1) return false;
     }
-    
+
     return true;
-  }
+  },
 };
 
 // Export utilities
-export { DOM, URLUtils }; 
+export {DOM, URLUtils};
