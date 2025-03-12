@@ -1,5 +1,5 @@
 {
-    "name": "Redirect Manager",
+    "name": "Avada Override",
     "version": "1.0",
     "manifest_version": 3,
     "description": "Redirect requests from specific domains to localhost for testing",

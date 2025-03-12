@@ -1,4 +1,4 @@
-# Redirect Manager Extension
+# Avada Override Extension
 
 This extension allows you to redirect URLs to localhost or other destinations based on configurable rules.
 
