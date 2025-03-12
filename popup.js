@@ -574,11 +574,6 @@ class PopupUI {
     const sectionEnabled = !rule.section || this.ruleManager.isSectionEnabled(rule.section);
     // Check if rule has both fromUrl and toUrl
     const hasValidUrls = rule.fromUrl && rule.fromUrl.trim() !== "" && rule.toUrl && rule.toUrl.trim() !== "";
-    // Rule is only effectively enabled if:
-    // 1. Global redirect is enabled (isEnabled)
-    // 2. Rule itself is not disabled (!rule.disabled)
-    // 3. Rule's section is enabled (sectionEnabled)
-    // 4. Rule has valid fromUrl and toUrl (hasValidUrls)
     const effectivelyEnabled = isEnabled && !rule.disabled && sectionEnabled && hasValidUrls;
     if (!effectivelyEnabled) {
       statusIndicator.classList.remove("rule__status--active");
