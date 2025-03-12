@@ -677,6 +677,10 @@ class PopupUI {
    */
   truncateUrl(url, maxLength) {
     if (!url) return "Unknown URL";
+    if (url === "Unknown destination") {
+      // Handle the specific case from background.js
+      return "Unknown destination (redirect not completed)";
+    }
     if (url.length <= maxLength) return url;
     return url.substring(0, maxLength - 3) + "...";
   }
@@ -733,13 +737,19 @@ class PopupUI {
       history.forEach((item) => {
         const historyItem = document.createElement("div");
         historyItem.className = "history__item";
-        const fromUrl = this.truncateUrl(item.fromUrl, 40);
+        const fromUrl = this.truncateUrl(item.fromUrl, 60);
         const toUrl = this.truncateUrl(item.toUrl, 40);
         const date = new Date(item.timestamp);
         const dateTimeString = date.toLocaleString(undefined, {
           month: 'short', day: 'numeric',
           hour: '2-digit', minute: '2-digit'
         });
+        
+        // Add a class to highlight items with unknown destinations
+        if (item.toUrl === "Unknown destination" || !item.toUrl) {
+          historyItem.classList.add("history__item--incomplete");
+        }
+        
         historyItem.innerHTML = `
           <div class="history__from"><strong>From:</strong> ${fromUrl}</div>
           <div class="history__to"><strong>To:</strong> ${toUrl}</div>

@@ -251,11 +251,15 @@ async function getCurrentRuleIds() {
 function recordRedirect(fromUrl, toUrl, ruleDetails = "Unknown rule") {
   redirectCount++;
 
+  // Ensure we have valid URLs
+  const validFromUrl = fromUrl || "Unknown source";
+  const validToUrl = toUrl || "Unknown destination";
+
   // Add to history (keep limited size)
   redirectHistory.unshift({
     timestamp: Date.now(),
-    fromUrl,
-    toUrl,
+    fromUrl: validFromUrl,
+    toUrl: validToUrl,
     ruleDetails,
   });
 
@@ -275,7 +279,13 @@ function recordRedirect(fromUrl, toUrl, ruleDetails = "Unknown rule") {
 if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
     const requestUrl = info.request.url;
-    const redirectUrl = info.redirect?.url || "Unknown destination";
+    // Provide more detailed information when redirect URL is not available
+    let redirectUrl = "Unknown destination";
+    if (info.redirect && info.redirect.url) {
+      redirectUrl = info.redirect.url;
+    } else if (info.redirect && info.redirect.regexSubstitution) {
+      redirectUrl = `Regex substitution: ${info.redirect.regexSubstitution}`;
+    }
 
     try {
       // Get rule details for better context
