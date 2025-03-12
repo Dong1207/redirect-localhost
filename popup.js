@@ -1,7 +1,6 @@
 import { DOM, URLUtils } from './utils.js';
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Cache DOM elements for better performance
   const elements = {
     enableToggle: document.getElementById("enableToggle"),
     redirectCountElem: document.getElementById("redirectCount"),
@@ -22,7 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
     toolsTab: document.getElementById("toolsTab"),
     addSectionBtn: document.getElementById("addSectionBtn"),
   };
-  // Create the main application
   const app = new RedirectApp(elements);
   app.init();
 });
