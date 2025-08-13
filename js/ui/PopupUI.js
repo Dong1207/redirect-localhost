@@ -78,6 +78,7 @@ export class PopupUI {
 
     this.elements.importRulesBtn.addEventListener("click", () => {
       const container = this.elements.importRulesBtn.closest(".import-export");
+      const overwrite = this.elements.overrideToggle.checked;
 
       ImportExportUI.importRules(async (importedRules, error) => {
         if (error) {
@@ -108,19 +109,11 @@ export class PopupUI {
         });
 
         let updatedCount = 0;
-        let overwrite = true;
-        if (duplicates.length > 0) {
-          overwrite = confirm(
-            `Found ${duplicates.length} rule${
-              duplicates.length > 1 ? "s" : ""
-            } with the same name. Overwrite existing?`
-          );
-          if (overwrite) {
-            duplicates.forEach(({rule, index}) => {
-              this.ruleManager.updateRule(index, rule);
-              updatedCount++;
-            });
-          }
+        if (overwrite) {
+          duplicates.forEach(({rule, index}) => {
+            this.ruleManager.updateRule(index, rule);
+            updatedCount++;
+          });
         }
 
         newRules.forEach((rule) => this.ruleManager.rules.push(rule));
@@ -139,6 +132,7 @@ export class PopupUI {
         this.displaySections();
 
         const addedCount = newRules.length;
+        const skippedCount = overwrite ? 0 : duplicates.length;
         const messages = [];
         if (addedCount)
           messages.push(
@@ -147,6 +141,10 @@ export class PopupUI {
         if (updatedCount)
           messages.push(
             `${updatedCount} rule${updatedCount > 1 ? "s" : ""} updated`
+          );
+        if (skippedCount)
+          messages.push(
+            `${skippedCount} duplicate rule${skippedCount > 1 ? "s" : ""} skipped`
           );
 
         ImportExportUI.showStatus(
@@ -191,28 +189,44 @@ export class PopupUI {
       tools: document.getElementById("toolsTab"),
     };
 
-    this.elements.tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        const tabId = tab.getAttribute("data-tab");
+    const activateTab = (tab) => {
+      const tabId = tab.getAttribute("data-tab");
 
-        // Update active tab
-        this.elements.tabs.forEach((t) =>
-          t.classList.remove("debug__tab--active")
-        );
-        tab.classList.add("debug__tab--active");
+      this.elements.tabs.forEach((t) => {
+        t.classList.remove("debug__tab--active");
+        t.setAttribute("aria-selected", "false");
+        t.setAttribute("tabindex", "-1");
+      });
+      tab.classList.add("debug__tab--active");
+      tab.setAttribute("aria-selected", "true");
+      tab.setAttribute("tabindex", "0");
 
-        // Update active content
-        this.elements.tabContents.forEach((content) => {
-          content.classList.remove("debug__content--active");
-        });
+      this.elements.tabContents.forEach((content) => {
+        content.classList.remove("debug__content--active");
+      });
 
-        // Find the corresponding content element and make it active
-        const contentElement = tabMapping[tabId];
-        if (contentElement) {
-          contentElement.classList.add("debug__content--active");
+      const contentElement = tabMapping[tabId];
+      if (contentElement) {
+        contentElement.classList.add("debug__content--active");
+      }
+    };
+
+    this.elements.tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => activateTab(tab));
+      tab.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          const dir = e.key === "ArrowRight" ? 1 : -1;
+          const newIndex =
+            (index + dir + this.elements.tabs.length) % this.elements.tabs.length;
+          this.elements.tabs[newIndex].focus();
+          activateTab(this.elements.tabs[newIndex]);
+          e.preventDefault();
         }
       });
     });
+
+    // Initialize selected tab state
+    activateTab(this.elements.tabs[0]);
   }
 
   /**

@@ -68,7 +68,8 @@ export class SectionUI {
       (e) => {
         e.stopPropagation();
         handlers.addNewRuleToSection(sectionName);
-      }
+      },
+      "Add New Rule"
     );
 
     const toggleBtn = DOM.createIconButton(
@@ -80,7 +81,8 @@ export class SectionUI {
       (e) => {
         e.stopPropagation();
         handlers.toggleSectionActive(sectionName);
-      }
+      },
+      "Toggle Section Active State"
     );
 
     const editBtn = DOM.createIconButton(
@@ -90,7 +92,8 @@ export class SectionUI {
       (e) => {
         e.stopPropagation();
         handlers.editSectionName(sectionName);
-      }
+      },
+      "Edit Section Name"
     );
 
     const deleteBtn = DOM.createIconButton(
@@ -100,7 +103,8 @@ export class SectionUI {
       (e) => {
         e.stopPropagation();
         handlers.deleteSection(sectionName);
-      }
+      },
+      "Delete Section"
     );
 
     // Assemble the section element
