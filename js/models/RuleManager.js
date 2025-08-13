@@ -138,6 +138,25 @@ export class RuleManager {
   }
 
   /**
+   * Find the index of a rule matching the given rule's identity
+   * Prefers matching by section and name, falling back to URLs
+   * @param {Object} rule - Rule to match
+   * @returns {number} Index of existing rule or -1 if not found
+   */
+  findRule(rule) {
+    if (rule.name) {
+      const nameMatch = this.rules.findIndex(
+        (r) => r.section === rule.section && r.name === rule.name
+      );
+      if (nameMatch !== -1) return nameMatch;
+    }
+
+    return this.rules.findIndex(
+      (r) => r.fromUrl === rule.fromUrl && r.toUrl === rule.toUrl
+    );
+  }
+
+  /**
    * Set section enabled state
    */
   setSectionEnabled(sectionName, enabled) {
