@@ -111,7 +111,6 @@ async function tryRestoreDebugMode() {
     });
     if (permissionCheck) {
       debugToPage = true;
-      await injectDebugScript();
     } else {
       await chrome.storage.local.set({debugToPage: false});
     }
@@ -440,100 +439,20 @@ async function handleDebugToggle(enabled) {
   await chrome.storage.local.set({debugToPage});
 
   if (debugToPage && !wasEnabled) {
-    // Only request permission and inject script if we're enabling debugging
+    // Request permission when enabling debugging
     const granted = await chrome.permissions.request({
       permissions: ["scripting"],
     });
     if (granted) {
-      try {
-        await injectDebugScript();
-        return {success: true, debugEnabled: true};
-      } catch (error) {
-        // Don't treat URL-related errors as failures
-        if (error instanceof TypeError && error.message.includes('Invalid URL')) {
-          console.log("Debug mode enabled, but current tab has invalid URL format");
-          return {success: true, debugEnabled: true, warning: "Current tab is not a valid HTTP page"};
-        }
-        
-        // Handle other errors
-        console.error("Debug script injection error:", error);
-        debugToPage = false;
-        await chrome.storage.local.set({debugToPage: false});
-        return {success: false, debugEnabled: false, error: error.message};
-      }
+      return {success: true, debugEnabled: true};
     } else {
       debugToPage = false;
       await chrome.storage.local.set({debugToPage: false});
       return {success: false, debugEnabled: false, error: "Permission denied"};
     }
   } else if (!debugToPage && wasEnabled) {
-    // When disabling debug, we don't need to do anything special
-    // The script will remain injected but won't receive any messages
-    // It will be removed when the page is refreshed
+    // No additional cleanup needed when disabling debug
   }
 
   return {success: true, debugEnabled: debugToPage};
-}
-
-// Inject debug script with proper handling of duplicates
-async function injectDebugScript() {
-  try {
-    // First check if the script is already registered
-    const existingScripts = await chrome.scripting
-      .getRegisteredContentScripts({ids: ["redirect-debug"]})
-      .catch(() => []);
-
-    // If the script already exists, unregister it first
-    if (existingScripts && existingScripts.length > 0) {
-      await chrome.scripting.unregisterContentScripts({
-        ids: ["redirect-debug"],
-      });
-    }
-
-    // Get the active tab
-    const tabs = await chrome.tabs.query({active: true, currentWindow: true});
-    if (!tabs || !tabs[0]) {
-      console.log("No active tab found for debug script injection");
-      return;
-    }
-
-    const activeTab = tabs[0];
-    
-    // Extract the origin from the active tab URL
-    try {
-      // Check if the URL is valid before trying to construct a URL object
-      if (!activeTab.url || !activeTab.url.startsWith('http')) {
-        // This is an expected case for chrome:// URLs, new tabs, etc.
-        console.log("Debug script not injected: not a valid http/https page");
-        return;
-      }
-      
-      const tabUrl = new URL(activeTab.url);
-      
-      // Only inject on http/https pages
-      if (tabUrl.protocol !== 'http:' && tabUrl.protocol !== 'https:') {
-        console.log("Debug script not injected: not an http/https page");
-        return;
-      }
-      
-      // Now we can safely register the script for this specific tab
-      await chrome.scripting.executeScript({
-        target: {tabId: activeTab.id},
-        files: ["debug-inject.js"]
-      });
-      
-      console.log("Debug script injected into active tab:", tabUrl.origin);
-    } catch (error) {
-      // This is likely a URL parsing error, which is expected for certain tabs
-      // Don't show an error for this case as it's not a real problem
-      if (error instanceof TypeError && error.message.includes('Invalid URL')) {
-        console.log("Debug script not injected: invalid URL format");
-      } else {
-        // Log other unexpected errors
-        console.error("Error injecting debug script:", error);
-      }
-    }
-  } catch (error) {
-    console.error("Failed to inject debug script:", error);
-  }
 }
