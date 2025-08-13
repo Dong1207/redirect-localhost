@@ -66,6 +66,7 @@ export class PopupUI {
       this.toggleDebugPanel()
     );
 
+
     // Debug panel event listeners
     this.elements.clearHistoryBtn.addEventListener("click", () =>
       this.clearRedirectHistory()
@@ -665,4 +666,5 @@ export class PopupUI {
   clearRedirectHistory() {
     HistoryUI.clearRedirectHistory(this.elements.redirectHistory);
   }
+}
 }
