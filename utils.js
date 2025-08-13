@@ -69,10 +69,11 @@ const DOM = {
    * @param {Function} onClick - Click handler
    * @returns {HTMLElement} The button element
    */
-  createIconButton(className, title, iconClass, onClick) {
+  createIconButton(className, title, iconClass, onClick, ariaLabel = title) {
     const button = this.createElement("button", {
       className: `btn ${className}`,
       title,
+      ariaLabel,
       innerHTML: `<i class="${iconClass}"></i>`,
     });
 

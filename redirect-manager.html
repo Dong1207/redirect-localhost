@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Avada Override</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" type="text/css" href="redirect-manager.css" />
     <link rel="stylesheet" type="text/css" href="button-effects.css" />
     <link
@@ -22,7 +23,12 @@
         <span class="stats__text">Redirected: <span id="redirectCount">0</span></span>
 
         <div class="controls">
-          <button id="debugBtn" class="btn controls__btn">
+          <button
+            id="debugBtn"
+            class="btn controls__btn"
+            title="Toggle Debug Panel"
+            aria-label="Toggle Debug Panel"
+          >
             <i class="fas fa-bug"></i>
           </button>
         </div>
@@ -30,9 +36,29 @@
 
       <!-- Debug panel (initially hidden) -->
       <div id="debugPanel" class="debug hidden">
-        <div class="debug__tabs">
-          <div class="debug__tab debug__tab--active" data-tab="history">History</div>
-          <div class="debug__tab" data-tab="tools">Tools</div>
+        <div class="debug__tabs" role="tablist">
+          <button
+            class="debug__tab debug__tab--active"
+            data-tab="history"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            tabindex="0"
+            aria-controls="historyTab"
+          >
+            History
+          </button>
+          <button
+            class="debug__tab"
+            data-tab="tools"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            tabindex="-1"
+            aria-controls="toolsTab"
+          >
+            Tools
+          </button>
         </div>
 
         <div id="historyTab" class="debug__content debug__content--active">
@@ -62,6 +88,22 @@
             <button id="importRulesBtn" class="btn import-export__btn btn--primary">
               <i class="fas fa-upload"></i> Import
             </button>
+
+            <div class="import-export__override">
+              <label class="toggle__switch switch">
+                <input
+                  type="checkbox"
+                  id="overrideToggle"
+                  class="toggle__input"
+                />
+                <span
+                  class="toggle__slider toggle__slider--round slider round"
+                ></span>
+              </label>
+              <label for="overrideToggle" class="toggle__label"
+                >Override duplicates</label
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -84,13 +126,13 @@
               <h3 class="rule__title">Rule</h3>
             </div>
             <div class="rule__actions">
-              <button class="btn rule__edit-btn" title="Edit Rule Name">
+              <button class="btn rule__edit-btn" title="Edit Rule Name" aria-label="Edit Rule Name">
                 <i class="fas fa-edit"></i>
               </button>
-              <button class="btn rule__toggle-btn" title="Toggle Rule Active State">
+              <button class="btn rule__toggle-btn" title="Toggle Rule Active State" aria-label="Toggle Rule Active State">
                 <i class="fas fa-power-off"></i>
               </button>
-              <button class="btn rule__delete-btn" title="Delete Rule">
+              <button class="btn rule__delete-btn" title="Delete Rule" aria-label="Delete Rule">
                 <i class="fas fa-trash"></i>
               </button>
             </div>

@@ -1,15 +1,21 @@
+html {
+    font-size: 16px;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
     background-color: #f5f5f5;
-    font-size: 13px;
+    font-size: 0.8125rem;
     line-height: 1.3;
 }
 
 /* Main container */
 .container {
-    width: 380px;
+    max-width: 380px;
+    width: 100%;
+    min-width: 400px;
     padding: 6px;
     background-color: white;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -17,7 +23,7 @@ body {
 
 /* Header */
 .header {
-    font-size: 14px;
+    font-size: 0.875rem;
     color: #333;
     margin: 0 0 6px 0;
     text-align: center;
@@ -86,7 +92,7 @@ body {
 }
 
 .toggle__label {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 /* Stats section */
@@ -95,13 +101,13 @@ body {
     padding: 6px;
     border-radius: 4px;
     margin-bottom: 8px;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .stats__text {
     margin: 0 0 0 8px;
     padding: 0;
-    font-size: 12px;
+    font-size: 0.75rem;
     color: #666;
 }
 
@@ -122,9 +128,11 @@ body {
 .debug__tab {
     padding: 4px 6px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.75rem;
     border-bottom: 2px solid transparent;
     transition: all 0.2s ease;
+    background: none;
+    border: none;
 }
 
 .debug__tab:hover {
@@ -163,13 +171,13 @@ body {
 }
 
 .debug-toggle__label {
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: normal;
 }
 
 .debug-toggle__btn {
     margin-left: auto;
-    font-size: 12px;
+    font-size: 0.75rem;
     padding: 2px 5px;
 }
 
@@ -205,7 +213,7 @@ body {
 .history__item {
     padding: 4px;
     border-bottom: 1px solid #eee;
-    font-size: 10px;
+    font-size: 0.625rem;
     line-height: 1.3;
 }
 
@@ -228,7 +236,9 @@ body {
     font-style: italic;
 }
 
-.history__from, .history__to, .history__time {
+.history__from,
+.history__to,
+.history__time {
     margin-bottom: 2px;
     white-space: nowrap;
     overflow: hidden;
@@ -245,7 +255,7 @@ body {
 
 .history__time {
     color: #888;
-    font-size: 9px;
+    font-size: 0.5625rem;
 }
 
 .history-empty {
@@ -253,7 +263,7 @@ body {
     font-style: italic;
     padding: 8px;
     text-align: center;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 /* Import/Export controls */
@@ -268,8 +278,17 @@ body {
     flex: 1;
     min-width: 80px;
     padding: 6px;
-    font-size: 12px;
+    font-size: 0.75rem;
     text-align: center;
+}
+
+.import-export__override {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin-top: 4px;
+    font-size: 0.75rem;
 }
 
 /* Import/export status message */
@@ -278,7 +297,7 @@ body {
     padding: 4px;
     margin-top: 6px;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 0.75rem;
     text-align: center;
 }
 
@@ -303,7 +322,7 @@ body {
     color: white;
     width: 100%;
     padding: 8px;
-    font-size: 14px;
+    font-size: 0.875rem;
     cursor: pointer;
     border: none;
     border-radius: 4px;
@@ -344,7 +363,7 @@ body {
 }
 
 .rule__collapse-icon {
-    font-size: 10px;
+    font-size: 0.625rem;
     color: #888;
     transition: transform 0.3s;
     flex-shrink: 0;
@@ -357,7 +376,7 @@ body {
 
 .rule__title {
     margin: 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 500;
     color: #333;
     white-space: nowrap;
@@ -418,7 +437,7 @@ body {
 .rule__label {
     display: block;
     margin-bottom: 2px;
-    font-size: 12px;
+    font-size: 0.75rem;
     color: #555;
 }
 
@@ -427,7 +446,7 @@ body {
     padding: 4px 6px;
     border: 1px solid #ddd;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 0.75rem;
     box-sizing: border-box;
 }
 
@@ -438,14 +457,14 @@ body {
 
 .rule__error-message {
     color: #ff3333;
-    font-size: 12px;
+    font-size: 0.75rem;
     margin-top: 4px;
     margin-bottom: 8px;
 }
 
 .rule__hint {
     margin: 2px 0 0;
-    font-size: 9px;
+    font-size: 0.5625rem;
     color: #888;
 }
 
@@ -478,7 +497,7 @@ body {
     justify-content: center;
     margin: 8px auto;
     padding: 4px 10px;
-    font-size: 12px;
+    font-size: 0.75rem;
     background-color: #f5f5f5;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -492,7 +511,7 @@ body {
 
 .advanced-options__toggle i {
     margin-right: 4px;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .advanced-options__sections {
@@ -502,7 +521,7 @@ body {
     border-top: 1px solid #eee;
     background-color: #f9f9f9;
     border-radius: 0 0 4px 4px;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 /* Advanced Section - Common styles for all sections */
@@ -520,7 +539,7 @@ body {
 
 .advanced-section__header {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 0.8125rem;
     margin-bottom: 6px;
     color: #444;
 }
@@ -529,7 +548,7 @@ body {
     display: block;
     margin-bottom: 4px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 0.8125rem;
     color: #444;
 }
 
@@ -540,7 +559,7 @@ body {
     margin-top: 4px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 0.75rem;
     box-sizing: border-box;
 }
 
@@ -551,7 +570,7 @@ body {
 }
 
 .advanced-section__help {
-    font-size: 12px;
+    font-size: 0.75rem;
     color: #777;
     margin-top: 2px;
 }
@@ -564,7 +583,7 @@ body {
     border-radius: 4px;
     font-weight: bold;
     transition: background-color 0.3s;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .btn--primary {
@@ -673,14 +692,14 @@ input:checked+.slider:before {
 .dialog__heading {
     margin-top: 0;
     margin-bottom: 12px;
-    font-size: 16px;
+    font-size: 1rem;
     color: #333;
 }
 
 .dialog__content {
     white-space: pre-wrap;
     font-family: monospace;
-    font-size: 12px;
+    font-size: 0.75rem;
     max-height: 300px;
     overflow-y: auto;
     padding: 10px;
@@ -732,7 +751,7 @@ input:checked+.slider:before {
 
 /* Section collapse icon */
 .section__collapse-icon {
-    font-size: 10px;
+    font-size: 0.625rem;
     color: #888;
     transition: transform 0.3s;
     flex-shrink: 0;
@@ -783,7 +802,7 @@ input:checked+.slider:before {
 /* Section title */
 .section__title {
     margin: 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 600;
     color: #333;
     white-space: nowrap;
@@ -818,7 +837,7 @@ input:checked+.slider:before {
     border: none;
     cursor: pointer;
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -827,7 +846,7 @@ input:checked+.slider:before {
 }
 
 .section__toggle-btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .section__toggle-btn--inactive {
@@ -837,7 +856,7 @@ input:checked+.slider:before {
 /* Section action buttons - make smaller but with better spacing */
 .section__actions .btn {
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     min-width: 20px;
     min-height: 20px;
     display: flex;
@@ -847,7 +866,7 @@ input:checked+.slider:before {
 }
 
 .section__actions .btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 /* Add section button */
@@ -860,7 +879,7 @@ input:checked+.slider:before {
     border-radius: 6px;
     text-align: center;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: #555;
     margin-top: 12px;
     transition: all 0.3s ease;
@@ -877,7 +896,7 @@ input:checked+.slider:before {
 
 .add-section i {
     margin-right: 6px;
-    font-size: 16px;
+    font-size: 1rem;
     vertical-align: middle;
 }
 
@@ -888,7 +907,7 @@ input:checked+.slider:before {
     border: none;
     cursor: pointer;
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -897,7 +916,7 @@ input:checked+.slider:before {
 }
 
 .section__delete-btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .section__delete-btn:hover {
@@ -911,7 +930,7 @@ input:checked+.slider:before {
     border: none;
     cursor: pointer;
     padding: 4px 8px;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .rule__section-btn:hover {
@@ -951,7 +970,7 @@ input:checked+.slider:before {
     padding: 6px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 
 /* Section rules container */
@@ -972,7 +991,7 @@ input:checked+.slider:before {
     border: none;
     cursor: pointer;
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -982,7 +1001,7 @@ input:checked+.slider:before {
 }
 
 .section__add-rule-btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .section__add-rule-btn:hover {
@@ -996,7 +1015,7 @@ input:checked+.slider:before {
     border: none;
     cursor: pointer;
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1005,7 +1024,7 @@ input:checked+.slider:before {
 }
 
 .section__edit-btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .section__edit-btn:hover {
@@ -1047,7 +1066,7 @@ input:checked+.slider:before {
     position: absolute;
     top: 10px;
     right: 15px;
-    font-size: 24px;
+    font-size: 1.5rem;
     font-weight: bold;
     cursor: pointer;
     color: #888;
@@ -1095,7 +1114,7 @@ input:checked+.slider:before {
 
 .controls__btn {
     padding: 4px 6px;
-    font-size: 12px;
+    font-size: 0.75rem;
     cursor: pointer;
     border: none;
     border-radius: 3px;
@@ -1109,7 +1128,7 @@ input:checked+.slider:before {
 }
 
 .controls__btn i {
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .controls__btn:hover {
@@ -1120,7 +1139,7 @@ input:checked+.slider:before {
 /* Rule action buttons - make smaller */
 .rule__actions .btn {
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     min-width: 18px;
     min-height: 18px;
     display: flex;
@@ -1130,13 +1149,13 @@ input:checked+.slider:before {
 }
 
 .rule__actions .btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 /* Section action buttons - make smaller */
 .section__actions .btn {
     padding: 1px 2px;
-    font-size: 10px;
+    font-size: 0.625rem;
     min-width: 18px;
     min-height: 18px;
     display: flex;
@@ -1145,14 +1164,16 @@ input:checked+.slider:before {
 }
 
 .section__actions .btn i {
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 /* Rules within a section should have more spacing */
 .section__rules .rule {
-    margin-bottom: 8px; /* Increased spacing for rules inside sections */
+    margin-bottom: 8px;
+    /* Increased spacing for rules inside sections */
 }
 
 .section__rules .rule:last-child {
-    margin-bottom: 0; /* Remove margin from last rule in section */
+    margin-bottom: 0;
+    /* Remove margin from last rule in section */
 }

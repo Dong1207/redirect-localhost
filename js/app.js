@@ -41,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
     clearHistoryBtn: document.getElementById("clearHistoryBtn"),
     exportRulesBtn: document.getElementById("exportRulesBtn"),
     importRulesBtn: document.getElementById("importRulesBtn"),
+    overrideToggle: document.getElementById("overrideToggle"),
     tabs: document.querySelectorAll(".debug__tab"),
     tabContents: document.querySelectorAll(".debug__content"),
     redirectHistory: document.getElementById("redirectHistory"),
