@@ -65,30 +65,93 @@ export class PopupUI {
     this.elements.debugBtn.addEventListener("click", () =>
       this.toggleDebugPanel()
     );
-    
-    this.elements.donateBtn.addEventListener("click", () => {
-      // Check if donate container is currently visible
-      const isDonateVisible =
-        !this.elements.donateContainer.classList.contains("hidden");
-      this.toggleDonateView(!isDonateVisible);
-    });
-    
-    this.elements.backToRulesBtn.addEventListener("click", () =>
-      this.toggleDonateView(false)
-    );
-    
+
     // Debug panel event listeners
     this.elements.clearHistoryBtn.addEventListener("click", () =>
       this.clearRedirectHistory()
     );
-    
-    this.elements.exportRulesBtn.addEventListener("click", () =>
-      this.exportRules()
-    );
-    
-    this.elements.importRulesBtn.addEventListener("click", () =>
-      this.importRules()
-    );
+
+    this.elements.exportRulesBtn.addEventListener("click", () => {
+      const container = this.elements.importRulesBtn.closest(".import-export");
+      ImportExportUI.exportRules(this.ruleManager.rules, container);
+    });
+
+    this.elements.importRulesBtn.addEventListener("click", () => {
+      const container = this.elements.importRulesBtn.closest(".import-export");
+
+      ImportExportUI.importRules(async (importedRules, error) => {
+        if (error) {
+          ImportExportUI.showStatus(
+            `Error importing rules: ${error.message}`,
+            false,
+            container
+          );
+          return;
+        }
+
+        if (!importedRules || importedRules.length === 0) {
+          ImportExportUI.showStatus(
+            "No valid rules found in the file.",
+            false,
+            container
+          );
+          return;
+        }
+
+        const duplicates = [];
+        const newRules = [];
+
+        importedRules.forEach((rule) => {
+          const index = this.ruleManager.findRule(rule);
+          if (index !== -1) duplicates.push({rule, index});
+          else newRules.push(rule);
+        });
+
+        let updatedCount = 0;
+        let overwrite = true;
+        if (duplicates.length > 0) {
+          overwrite = confirm(
+            `Found ${duplicates.length} rule${duplicates.length > 1 ? 's' : ''} with the same name. Overwrite existing?`
+          );
+          if (overwrite) {
+            duplicates.forEach(({rule, index}) => {
+              this.ruleManager.updateRule(index, rule);
+              updatedCount++;
+            });
+          }
+        }
+
+        newRules.forEach((rule) => this.ruleManager.rules.push(rule));
+
+        const appliedRules = overwrite
+          ? newRules.concat(duplicates.map((d) => d.rule))
+          : newRules;
+
+        appliedRules.forEach((rule) => {
+          if (!this.ruleManager.sections[rule.section]) {
+            this.ruleManager.sections[rule.section] = {enabled: true};
+          }
+        });
+
+        await this.ruleManager.saveRules();
+        this.displaySections();
+
+        const addedCount = newRules.length;
+        const messages = [];
+        if (addedCount)
+          messages.push(`${addedCount} new rule${addedCount > 1 ? 's' : ''} added`);
+        if (updatedCount)
+          messages.push(`${updatedCount} rule${updatedCount > 1 ? 's' : ''} updated`);
+
+        ImportExportUI.showStatus(
+          messages.length
+            ? `Successfully imported ${messages.join(' and ')}.`
+            : 'No new rules were imported.',
+          true,
+          container
+        );
+      });
+    });
     
     // Debug toggle setup
     chrome.storage.local.get(["debugToPage"], (result) => {
@@ -602,110 +665,4 @@ export class PopupUI {
   clearRedirectHistory() {
     HistoryUI.clearRedirectHistory(this.elements.redirectHistory);
   }
-
-  /**
-   * Export rules
-   */
-  exportRules() {
-    const container = this.elements.importRulesBtn.closest(".import-export");
-    ImportExportUI.exportRules(this.ruleManager.rules, container);
-  }
-
-  /**
-   * Import rules
-   */
-  importRules() {
-    const container = this.elements.importRulesBtn.closest(".import-export");
-    
-    ImportExportUI.importRules(async (importedRules, error) => {
-      if (error) {
-        ImportExportUI.showStatus(
-          `Error importing rules: ${error.message}`,
-          false,
-          container
-        );
-        return;
-      }
-      
-      if (!importedRules || importedRules.length === 0) {
-        ImportExportUI.showStatus(
-          "No valid rules found in the file.",
-          false,
-          container
-        );
-        return;
-      }
-      
-      // Add imported rules to existing rules
-      importedRules.forEach(rule => {
-        this.ruleManager.rules.push(rule);
-      });
-      
-      // Initialize sections from imported rules
-      this.ruleManager.rules.forEach(rule => {
-        if (
-          rule.section &&
-          !this.ruleManager.sections.hasOwnProperty(rule.section)
-        ) {
-          this.ruleManager.sections[rule.section] = {enabled: true};
-        }
-      });
-      
-      // Save to storage
-      await this.ruleManager.saveRules();
-      
-      // Update UI
-      this.displaySections();
-      
-      // Show success message
-      ImportExportUI.showStatus(
-        `Successfully imported ${importedRules.length} rules.`,
-        true,
-        container
-      );
-    });
-  }
-
-  /**
-   * Toggle donate view visibility
-   * @param {boolean} isVisible - Whether to show the donate view
-   */
-  toggleDonateView(isVisible) {
-    const {donateContainer, rulesContainer, addSectionBtn, debugPanel} =
-      this.elements;
-
-    // Toggle visibility of elements
-    donateContainer.classList.toggle("hidden", !isVisible);
-    rulesContainer.classList.toggle("hidden", isVisible);
-
-    // Ensure the addSectionBtn is properly hidden/shown
-    if (isVisible) {
-      addSectionBtn.classList.add("hidden");
-    } else {
-      addSectionBtn.classList.remove("hidden");
-    }
-
-    // Also hide debug panel when showing donate view
-    if (isVisible && !debugPanel.classList.contains("hidden")) {
-      debugPanel.classList.add("hidden");
-    }
-
-    // Add click handler for the donate container to go back
-    if (isVisible) {
-      // Use event delegation to handle clicks on the container
-      const handleContainerClick = (event) => {
-        // Don't trigger when clicking on specific elements
-        const isExcludedElement = [
-          "donate-image",
-          "donate-title",
-          "back-btn",
-        ].some((className) => event.target.closest(`.${className}`));
-        if (isExcludedElement) return;
-        // Toggle back to rules view
-        this.toggleDonateView(false);
-        donateContainer.removeEventListener("click", handleContainerClick);
-      };
-      donateContainer.addEventListener("click", handleContainerClick);
-    }
-  }
-} 
+}
