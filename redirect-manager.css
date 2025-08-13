@@ -15,7 +15,7 @@ body {
 .container {
     max-width: 380px;
     width: 100%;
-    min-width: 300px;
+    min-width: 400px;
     padding: 6px;
     background-color: white;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -236,7 +236,9 @@ body {
     font-style: italic;
 }
 
-.history__from, .history__to, .history__time {
+.history__from,
+.history__to,
+.history__time {
     margin-bottom: 2px;
     white-space: nowrap;
     overflow: hidden;
@@ -1167,9 +1169,11 @@ input:checked+.slider:before {
 
 /* Rules within a section should have more spacing */
 .section__rules .rule {
-    margin-bottom: 8px; /* Increased spacing for rules inside sections */
+    margin-bottom: 8px;
+    /* Increased spacing for rules inside sections */
 }
 
 .section__rules .rule:last-child {
-    margin-bottom: 0; /* Remove margin from last rule in section */
+    margin-bottom: 0;
+    /* Remove margin from last rule in section */
 }
