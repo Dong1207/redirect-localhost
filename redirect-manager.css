@@ -868,11 +868,6 @@ input:checked+.slider:before {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-/* Ensure add-section button is hidden when donate container is visible */
-.add-section.hidden {
-    display: none !important;
-}
-
 .add-section:hover {
     background-color: #e8f5e9;
     border-color: #4caf50;
@@ -1089,56 +1084,6 @@ input:checked+.slider:before {
     object-fit: contain;
     border-radius: 4px;
     display: block;
-}
-
-/* Donate Container */
-.donate-container {
-    width: 100%;
-    margin-bottom: 20px;
-    padding: 4px;
-}
-
-.donate-container.hidden {
-    display: none;
-}
-
-.donate-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-}
-
-.donate-title {
-    font-size: 12px;
-    margin: 0;
-}
-
-.back-btn {
-    padding: 2px 4px;
-    font-size: 10px;
-    background-color: #f0f0f0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.back-btn:hover {
-    background-color: #e0e0e0;
-}
-
-.donate-body {
-    text-align: center;
-}
-
-.donate-image {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 0 auto;
-    border-radius: 4px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 /* Control buttons */
