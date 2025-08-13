@@ -182,12 +182,14 @@
     });
     
     // Bắt đầu theo dõi các thay đổi trong DOM
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
+    document.addEventListener('DOMContentLoaded', () => {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+      
+      console.log("MutationObserver setup complete");
     });
-    
-    console.log("MutationObserver setup complete");
   }
   
   // Chạy các hàm sửa lỗi
