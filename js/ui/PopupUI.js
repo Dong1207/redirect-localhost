@@ -164,18 +164,31 @@ export class PopupUI {
 
     this.elements.debugToPageToggle.addEventListener("change", () => {
       const enabled = this.elements.debugToPageToggle.checked;
-      chrome.runtime.sendMessage(
-        {action: "toggleDebugToPage", enabled},
-        (response) => {
-          if (
-            response?.debugEnabled !== undefined &&
-            response.debugEnabled !== enabled
-          ) {
-            this.elements.debugToPageToggle.checked = response.debugEnabled;
+
+      if (enabled) {
+        chrome.permissions.request({permissions: ["scripting"]}, (granted) => {
+          if (granted) {
+            chrome.runtime.sendMessage(
+              {action: "toggleDebugToPage", enabled: true},
+              (response) => {
+                if (
+                  response?.debugEnabled !== undefined &&
+                  response.debugEnabled !== true
+                ) {
+                  this.elements.debugToPageToggle.checked = response.debugEnabled;
+                }
+              }
+            );
+            chrome.storage.local.set({debugToPage: true});
+          } else {
+            this.elements.debugToPageToggle.checked = false;
+            chrome.storage.local.set({debugToPage: false});
           }
-        }
-      );
-      chrome.storage.local.set({debugToPage: enabled});
+        });
+      } else {
+        chrome.runtime.sendMessage({action: "toggleDebugToPage", enabled: false});
+        chrome.storage.local.set({debugToPage: false});
+      }
     });
   }
 

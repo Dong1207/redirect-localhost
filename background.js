@@ -439,19 +439,14 @@ async function handleDebugToggle(enabled) {
   await chrome.storage.local.set({debugToPage});
 
   if (debugToPage && !wasEnabled) {
-    // Request permission when enabling debugging
-    const granted = await chrome.permissions.request({
+    const hasPermission = await chrome.permissions.contains({
       permissions: ["scripting"],
     });
-    if (granted) {
-      return {success: true, debugEnabled: true};
-    } else {
+    if (!hasPermission) {
       debugToPage = false;
       await chrome.storage.local.set({debugToPage: false});
-      return {success: false, debugEnabled: false, error: "Permission denied"};
+      return {success: false, debugEnabled: false, error: "Permission missing"};
     }
-  } else if (!debugToPage && wasEnabled) {
-    // No additional cleanup needed when disabling debug
   }
 
   return {success: true, debugEnabled: debugToPage};
