@@ -1,45 +1,66 @@
-# Avada Override Extension
+# Avada Override
 
-This extension allows you to redirect URLs to localhost or other destinations based on configurable rules.
+A Chrome extension (Manifest V3) that redirects HTTP/HTTPS requests from specific domains to localhost or other destinations for development and testing.
+
+## Features
+
+- **URL Redirect Rules** - Define from/to URL pairs with `**` wildcard support for partial matching
+- **Sections** - Organize rules into collapsible sections, each can be toggled independently
+- **Import/Export** - Save and load rules as JSON files with duplicate detection (skip or override)
+- **Debug Panel** - View redirect history, active rules, and optionally log redirects to page console
+- **Real-time Validation** - Auto-validates URLs and disables invalid rules
+
+## How It Works
+
+1. Click the extension icon to open the side panel
+2. Create sections to organize your redirect rules
+3. Add rules with source URL (`https://cdn.example.com/**`) and target URL (`http://localhost:3000/**`)
+4. Toggle the main switch to enable/disable all redirects
+5. The `**` wildcard captures any path segment and substitutes it in the target URL
 
 ## Project Structure
 
-The codebase has been refactored to use a modular architecture:
-
 ```
-.
+├── manifest.json                 # Extension configuration (MV3)
+├── background.js                 # Service worker - request interception & history
+├── redirect-manager.html         # Popup UI template
+├── redirect-manager.js           # Popup entry point
+├── redirect-manager.css          # Main styles
+├── button-effects.css            # Button animations
+├── utils.js                      # DOM & URL utilities
 ├── js/
-│   ├── app.js               # Main application entry point
-│   ├── models/              # Data models
-│   │   ├── RedirectRule.js  # Rule model
-│   │   └── RuleManager.js   # Rule management
-│   └── ui/                  # UI controllers
-│       ├── HistoryUI.js     # History UI controller
-│       ├── ImportExportUI.js # Import/Export UI controller
-│       ├── PopupUI.js       # Main popup UI controller
-│       ├── RuleUI.js        # Rule UI controller
-│       └── SectionUI.js     # Section UI controller
-├── utils.js                 # Utility functions
-├── redirect-manager.js      # Entry point for the UI
-├── redirect-manager.html    # Main HTML file
-└── redirect-manager.css     # Styles
+│   ├── app.js                    # App initialization
+│   ├── models/
+│   │   ├── RedirectRule.js       # Rule data model
+│   │   └── RuleManager.js        # Rule collection & persistence
+│   └── ui/
+│       ├── PopupUI.js            # Main popup controller
+│       ├── RuleUI.js             # Rule UI component
+│       ├── SectionUI.js          # Section UI component
+│       ├── HistoryUI.js          # Redirect history display
+│       └── ImportExportUI.js     # JSON import/export
+└── icons/                        # Extension icons
 ```
 
 ## Architecture
 
-The extension follows a modular architecture:
+- **Models** - Data and business logic (`RedirectRule`, `RuleManager`)
+- **UI Controllers** - Separated concerns per feature (`PopupUI`, `RuleUI`, `SectionUI`, `HistoryUI`, `ImportExportUI`)
+- **Utils** - Shared DOM manipulation and URL validation helpers
+- **Background** - Chrome `declarativeNetRequest` API for actual request interception
 
-- **Models**: Handle data and business logic
-- **UI Controllers**: Handle UI interactions and updates
-- **Utils**: Utility functions for DOM manipulation and URL handling
+ES6 modules loaded via `<script type="module">`. No build step required.
+
+## Permissions
+
+| Permission | Purpose |
+|---|---|
+| `storage` | Persist rules and settings |
+| `declarativeNetRequest` | Intercept and redirect requests |
+| `declarativeNetRequestFeedback` | Track redirect history |
+| `webRequest` | Monitor network requests |
+| `scripting` (optional) | Log redirects to page console |
 
 ## Development
 
-To modify the extension:
-
-1. Edit the appropriate module based on the feature you're working on
-2. Follow the existing patterns for consistency
-
-## Building
-
-The extension is built using vanilla JavaScript modules. No build step is required. 
+Edit the appropriate module based on the feature. Load the extension in Chrome via `chrome://extensions` > "Load unpacked".

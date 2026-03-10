@@ -32,7 +32,6 @@ export class RedirectApp {
 document.addEventListener("DOMContentLoaded", () => {
   const elements = {
     enableToggle: document.getElementById("enableToggle"),
-    redirectCountElem: document.getElementById("redirectCount"),
     rulesContainer: document.getElementById("rulesContainer"),
     ruleTemplate: document.getElementById("ruleTemplate"),
     debugBtn: document.getElementById("debugBtn"),

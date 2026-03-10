@@ -1,6 +1,6 @@
 {
     "name": "Avada Override",
-    "version": "1.1",
+    "version": "1.2",
     "manifest_version": 3,
     "description": "Redirect requests from specific domains to localhost for testing",
     "icons": {
@@ -9,18 +9,21 @@
         "128": "icons/icon-128x128.png"
     },
     "action": {
-        "default_popup": "redirect-manager.html",
         "default_icon": {
             "16": "icons/icon-16x16.png",
             "48": "icons/icon-48x48.png",
             "128": "icons/icon-128x128.png"
         }
     },
+    "side_panel": {
+        "default_path": "redirect-manager.html"
+    },
     "permissions": [
         "storage",
         "declarativeNetRequest",
         "declarativeNetRequestFeedback",
-        "webRequest"
+        "webRequest",
+        "sidePanel"
     ],
     "optional_permissions": [
         "scripting"
